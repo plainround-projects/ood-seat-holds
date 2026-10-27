@@ -40,33 +40,45 @@ The lesson designs a **state machine** for seats with a sealed type and pure fun
 
 ### `domain/SeatId.java`, `CustomerId.java`: ids that cannot be blank
 
+File: `src/main/java/io/plainround/seatholds/domain/SeatId.java`
+
+**Lines 1 to 8**
+
 ```java
- 1  package io.plainround.seatholds.domain;
- 2  
- 3  /**
- 4   * Identifier of a seat; never blank.
- 5   *
- 6   * @param value the id, such as {@code s-9}
- 7   */
- 8  public record SeatId(String value) {
- 9  
-10    /**
-11     * Creates a seat id.
-12     *
-13     * @throws IllegalArgumentException if the value is null or blank
-14     */
-15    public SeatId {
-16      if (value == null || value.isBlank()) {
-17        throw new IllegalArgumentException("seat id must not be blank");
-18      }
-19      value = value.strip();
-20    }
-21  
-22    @Override
-23    public String toString() {
-24      return value;
-25    }
-26  }
+package io.plainround.seatholds.domain;
+
+/**
+ * Identifier of a seat; never blank.
+ *
+ * @param value the id, such as {@code s-9}
+ */
+public record SeatId(String value) {
+```
+
+**Lines 10 to 20**
+
+```java
+  /**
+   * Creates a seat id.
+   *
+   * @throws IllegalArgumentException if the value is null or blank
+   */
+  public SeatId {
+    if (value == null || value.isBlank()) {
+      throw new IllegalArgumentException("seat id must not be blank");
+    }
+    value = value.strip();
+  }
+```
+
+**Lines 22 to 26**
+
+```java
+  @Override
+  public String toString() {
+    return value;
+  }
+}
 ```
 
 | Lines | What they do |
@@ -76,68 +88,136 @@ The lesson designs a **state machine** for seats with a sealed type and pure fun
 | 15-20 | The **compact constructor**: it runs before the field is set. Lines 16-18 refuse `null` or blank text (`isBlank()` is true for empty text or spaces only). Line 19 trims the text (`value = value.strip();`), so `new SeatId(" s-9 ")` equals `new SeatId("s-9")`. |
 | 22-25 | `@Override` (the compiler checks it replaces an inherited method) `toString` returns the plain text, so logs print `s-9`. |
 
-`CustomerId` is identical line for line with `customer id` in the messages: a record around text, a compact constructor that rejects blank text and trims, and a `toString` that returns the text.
+File: `src/main/java/io/plainround/seatholds/domain/CustomerId.java`
+
+**Lines 1 to 8**
+
+```java
+package io.plainround.seatholds.domain;
+
+/**
+ * Identifier of a customer; never blank.
+ *
+ * @param value the id, such as {@code ada}
+ */
+public record CustomerId(String value) {
+```
+
+**Lines 10 to 20**
+
+```java
+  /**
+   * Creates a customer id.
+   *
+   * @throws IllegalArgumentException if the value is null or blank
+   */
+  public CustomerId {
+    if (value == null || value.isBlank()) {
+      throw new IllegalArgumentException("customer id must not be blank");
+    }
+    value = value.strip();
+  }
+```
+
+**Lines 22 to 26**
+
+```java
+  @Override
+  public String toString() {
+    return value;
+  }
+}
+```
+
+| Lines | What they do |
+| --- | --- |
+| 1 | `package ...domain;` puts the file in the domain layer. |
+| 3-7 | A Javadoc comment (text for people, ignored by the compiler): what the type is, and `@param value` documents the one component. `{@code ada}` shows `ada` in code style. |
+| 8 | `public record CustomerId(String value)`: the same one-field record as `SeatId`, a different type, so a customer id cannot be passed where a seat id belongs. |
+| 10-14 | A Javadoc comment for the constructor; `@throws` documents when it refuses. |
+| 15-20 | The compact constructor. Lines 16-18: if the text is `null` or blank, throw `IllegalArgumentException("customer id must not be blank")`. Line 19: replace the text with the trimmed text. |
+| 22-25 | `toString` returns the plain text, so a log line prints `ada` and not `CustomerId[value=ada]`. |
 
 ### `domain/SeatState.java`: three states as data
 
+File: `src/main/java/io/plainround/seatholds/domain/SeatState.java`
+
+**Lines 1 to 12**
+
 ```java
- 1  package io.plainround.seatholds.domain;
- 2  
- 3  import java.time.Instant;
- 4  import java.time.temporal.ChronoUnit;
- 5  
- 6  /**
- 7   * Where a seat is in its life: free, held for one customer until a time, or sold. Data, not an
- 8   * object with behavior: the transitions are pure functions in {@link SeatTransitions}, and the
- 9   * guarantee that a seat is sold at most once belongs to {@link SeatStore#update}, not to these
-10   * records.
-11   */
-12  public sealed interface SeatState permits SeatState.Free, SeatState.Held, SeatState.Sold {
-13  
-14    /** Nobody holds the seat and it has not been sold. */
-15    record Free() implements SeatState {}
-16  
-17    /**
-18     * One customer has the seat for a limited time.
-19     *
-20     * @param customer who holds it
-21     * @param expiresAt the last instant the hold can be confirmed, kept to the millisecond so every
-22     *     store, whatever its timestamp precision, compares equal values as equal
-23     */
-24    record Held(CustomerId customer, Instant expiresAt) implements SeatState {
-25  
-26      /**
-27       * Normalizes the expiry to milliseconds.
-28       *
-29       * @throws IllegalArgumentException if the customer or the expiry is missing
-30       */
-31      public Held {
-32        if (customer == null || expiresAt == null) {
-33          throw new IllegalArgumentException("a hold needs a customer and an expiry");
-34        }
-35        expiresAt = expiresAt.truncatedTo(ChronoUnit.MILLIS);
-36      }
-37    }
-38  
-39    /**
-40     * The seat is sold.
-41     *
-42     * @param customer who bought it
-43     */
-44    record Sold(CustomerId customer) implements SeatState {
-45  
-46      /**
-47       * Validates the buyer.
-48       *
-49       * @throws IllegalArgumentException if the customer is missing
-50       */
-51      public Sold {
-52        if (customer == null) {
-53          throw new IllegalArgumentException("a sale needs a customer");
-54        }
-55      }
-56    }
-57  }
+package io.plainround.seatholds.domain;
+
+import java.time.Instant;
+import java.time.temporal.ChronoUnit;
+
+/**
+ * Where a seat is in its life: free, held for one customer until a time, or sold. Data, not an
+ * object with behavior: the transitions are pure functions in {@link SeatTransitions}, and the
+ * guarantee that a seat is sold at most once belongs to {@link SeatStore#update}, not to these
+ * records.
+ */
+public sealed interface SeatState permits SeatState.Free, SeatState.Held, SeatState.Sold {
+```
+
+**Lines 14 to 24**
+
+```java
+  /** Nobody holds the seat and it has not been sold. */
+  record Free() implements SeatState {}
+
+  /**
+   * One customer has the seat for a limited time.
+   *
+   * @param customer who holds it
+   * @param expiresAt the last instant the hold can be confirmed, kept to the millisecond so every
+   *     store, whatever its timestamp precision, compares equal values as equal
+   */
+  record Held(CustomerId customer, Instant expiresAt) implements SeatState {
+```
+
+**Lines 26 to 37**
+
+```java
+    /**
+     * Normalizes the expiry to milliseconds.
+     *
+     * @throws IllegalArgumentException if the customer or the expiry is missing
+     */
+    public Held {
+      if (customer == null || expiresAt == null) {
+        throw new IllegalArgumentException("a hold needs a customer and an expiry");
+      }
+      expiresAt = expiresAt.truncatedTo(ChronoUnit.MILLIS);
+    }
+  }
+```
+
+**Lines 39 to 44**
+
+```java
+  /**
+   * The seat is sold.
+   *
+   * @param customer who bought it
+   */
+  record Sold(CustomerId customer) implements SeatState {
+```
+
+**Lines 46 to 57**
+
+```java
+    /**
+     * Validates the buyer.
+     *
+     * @throws IllegalArgumentException if the customer is missing
+     */
+    public Sold {
+      if (customer == null) {
+        throw new IllegalArgumentException("a sale needs a customer");
+      }
+    }
+  }
+}
 ```
 
 | Lines | What they do |
@@ -152,109 +232,152 @@ These records hold only **data**. The rules about what may follow what are in `S
 
 ### `domain/Outcome.java`
 
+File: `src/main/java/io/plainround/seatholds/domain/Outcome.java`
+
+**Lines 1 to 11**
+
 ```java
- 1  package io.plainround.seatholds.domain;
- 2  
- 3  /** What a transition decides: the next state, or a reason there is none. Never an exception. */
- 4  public sealed interface Outcome permits Outcome.Success, Outcome.Reason {
- 5  
- 6    /**
- 7     * The transition is allowed.
- 8     *
- 9     * @param newState the state the seat should move to
-10     */
-11    record Success(SeatState newState) implements Outcome {}
-12  
-13    /**
-14     * The transition is refused.
-15     *
-16     * @param message why, in words a caller can show
-17     */
-18    record Reason(String message) implements Outcome {}
-19  }
+package io.plainround.seatholds.domain;
+
+/** What a transition decides: the next state, or a reason there is none. Never an exception. */
+public sealed interface Outcome permits Outcome.Success, Outcome.Reason {
+
+  /**
+   * The transition is allowed.
+   *
+   * @param newState the state the seat should move to
+   */
+  record Success(SeatState newState) implements Outcome {}
+```
+
+**Lines 13 to 19**
+
+```java
+  /**
+   * The transition is refused.
+   *
+   * @param message why, in words a caller can show
+   */
+  record Reason(String message) implements Outcome {}
+}
 ```
 
 Line 4 declares another sealed interface with exactly two cases. Line 11, `record Success(SeatState newState)`, is the answer "allowed: move the seat to this state". Line 18, `record Reason(String message)`, is "refused, and here is why". A refusal is a normal answer, not an exception: callers must handle both because the interface is sealed.
 
 ### `domain/SeatTransitions.java`: pure functions with guarded patterns
 
+File: `src/main/java/io/plainround/seatholds/domain/SeatTransitions.java`
+
+**Lines 1 to 8**
+
 ```java
- 1  package io.plainround.seatholds.domain;
- 2  
- 3  import io.plainround.seatholds.domain.Outcome.Reason;
- 4  import io.plainround.seatholds.domain.Outcome.Success;
- 5  import io.plainround.seatholds.domain.SeatState.Free;
- 6  import io.plainround.seatholds.domain.SeatState.Held;
- 7  import io.plainround.seatholds.domain.SeatState.Sold;
- 8  import java.time.Duration;
- 9  
-10  /**
-11   * The seat's state machine as pure functions: each takes the current state and returns the next
-12   * state or a reason. Nothing here reads a store, mutates anything or throws, so every transition is
-13   * testable with a value and a fixed clock.
-14   *
-15   * <p>The edges are free to held (hold), held to sold (confirm, before the expiry), and held to free
-16   * (release, after the expiry). The instant of the expiry itself belongs to the customer: a confirm
-17   * at that instant succeeds and a release is refused, so the two cannot both be right.
-18   */
-19  public final class SeatTransitions {
-20  
-21    private SeatTransitions() {}
-22  
-23    /**
-24     * A customer asks to hold a seat.
-25     *
-26     * @param current the seat's state
-27     * @param customer who asks
-28     * @param clock the time source
-29     * @param holdFor how long the hold lasts
-30     * @return the hold, or why not
-31     */
-32    public static Outcome hold(
-33        SeatState current, CustomerId customer, Clock clock, Duration holdFor) {
-34      return switch (current) {
-35        case Free free -> new Success(new Held(customer, clock.now().plus(holdFor)));
-36        case Held held -> new Reason("seat is held");
-37        case Sold sold -> new Reason("already sold");
-38      };
-39    }
-40  
-41    /**
-42     * A customer confirms the hold they were given.
-43     *
-44     * @param current the seat's state
-45     * @param customer who confirms
-46     * @param clock the time source
-47     * @return the sale, or why not
-48     */
-49    public static Outcome confirm(SeatState current, CustomerId customer, Clock clock) {
-50      return switch (current) {
-51        case Held held
-52            when held.customer().equals(customer) && !clock.now().isAfter(held.expiresAt()) ->
-53            new Success(new Sold(customer));
-54        case Held held when held.customer().equals(customer) -> new Reason("hold expired");
-55        case Held held -> new Reason("held by someone else");
-56        case Free free -> new Reason("not held");
-57        case Sold sold -> new Reason("already sold");
-58      };
-59    }
-60  
-61    /**
-62     * The sweeper frees a hold whose time has run out.
-63     *
-64     * @param current the seat's state
-65     * @param clock the time source
-66     * @return the freed seat, or why not
-67     */
-68    public static Outcome release(SeatState current, Clock clock) {
-69      return switch (current) {
-70        case Held held when clock.now().isAfter(held.expiresAt()) -> new Success(new Free());
-71        case Held held -> new Reason("hold not expired");
-72        case Free free -> new Reason("not held");
-73        case Sold sold -> new Reason("already sold");
-74      };
-75    }
-76  }
+package io.plainround.seatholds.domain;
+
+import io.plainround.seatholds.domain.Outcome.Reason;
+import io.plainround.seatholds.domain.Outcome.Success;
+import io.plainround.seatholds.domain.SeatState.Free;
+import io.plainround.seatholds.domain.SeatState.Held;
+import io.plainround.seatholds.domain.SeatState.Sold;
+import java.time.Duration;
+```
+
+**Lines 10 to 19**
+
+```java
+/**
+ * The seat's state machine as pure functions: each takes the current state and returns the next
+ * state or a reason. Nothing here reads a store, mutates anything or throws, so every transition is
+ * testable with a value and a fixed clock.
+ *
+ * <p>The edges are free to held (hold), held to sold (confirm, before the expiry), and held to free
+ * (release, after the expiry). The instant of the expiry itself belongs to the customer: a confirm
+ * at that instant succeeds and a release is refused, so the two cannot both be right.
+ */
+public final class SeatTransitions {
+```
+
+**Lines 21 to 33**
+
+```java
+  private SeatTransitions() {}
+
+  /**
+   * A customer asks to hold a seat.
+   *
+   * @param current the seat's state
+   * @param customer who asks
+   * @param clock the time source
+   * @param holdFor how long the hold lasts
+   * @return the hold, or why not
+   */
+  public static Outcome hold(
+      SeatState current, CustomerId customer, Clock clock, Duration holdFor) {
+```
+
+**Lines 34 to 39**
+
+```java
+    return switch (current) {
+      case Free free -> new Success(new Held(customer, clock.now().plus(holdFor)));
+      case Held held -> new Reason("seat is held");
+      case Sold sold -> new Reason("already sold");
+    };
+  }
+```
+
+**Lines 41 to 53**
+
+```java
+  /**
+   * A customer confirms the hold they were given.
+   *
+   * @param current the seat's state
+   * @param customer who confirms
+   * @param clock the time source
+   * @return the sale, or why not
+   */
+  public static Outcome confirm(SeatState current, CustomerId customer, Clock clock) {
+    return switch (current) {
+      case Held held
+          when held.customer().equals(customer) && !clock.now().isAfter(held.expiresAt()) ->
+          new Success(new Sold(customer));
+```
+
+**Lines 54 to 59**
+
+```java
+      case Held held when held.customer().equals(customer) -> new Reason("hold expired");
+      case Held held -> new Reason("held by someone else");
+      case Free free -> new Reason("not held");
+      case Sold sold -> new Reason("already sold");
+    };
+  }
+```
+
+**Lines 61 to 73**
+
+```java
+  /**
+   * The sweeper frees a hold whose time has run out.
+   *
+   * @param current the seat's state
+   * @param clock the time source
+   * @return the freed seat, or why not
+   */
+  public static Outcome release(SeatState current, Clock clock) {
+    return switch (current) {
+      case Held held when clock.now().isAfter(held.expiresAt()) -> new Success(new Free());
+      case Held held -> new Reason("hold not expired");
+      case Free free -> new Reason("not held");
+      case Sold sold -> new Reason("already sold");
+```
+
+**Lines 74 to 76**
+
+```java
+    };
+  }
+}
 ```
 
 | Lines | What they do |
@@ -269,22 +392,30 @@ The boundary is on purpose complementary: `confirm` uses `!now.isAfter(expiresAt
 
 ### `domain/Clock.java`, `SeatStore.java`, the exceptions: the ports
 
+File: `src/main/java/io/plainround/seatholds/domain/Clock.java`
+
+**Lines 1 to 7**
+
 ```java
- 1  package io.plainround.seatholds.domain;
- 2  
- 3  import java.time.Instant;
- 4  
- 5  /** Outbound port: the current time, injected so an expired hold can be tested without waiting. */
- 6  @FunctionalInterface
- 7  public interface Clock {
- 8  
- 9    /**
-10     * The current instant.
-11     *
-12     * @return now
-13     */
-14    Instant now();
-15  }
+package io.plainround.seatholds.domain;
+
+import java.time.Instant;
+
+/** Outbound port: the current time, injected so an expired hold can be tested without waiting. */
+@FunctionalInterface
+public interface Clock {
+```
+
+**Lines 9 to 15**
+
+```java
+  /**
+   * The current instant.
+   *
+   * @return now
+   */
+  Instant now();
+}
 ```
 
 | Lines | What they do |
@@ -294,54 +425,74 @@ The boundary is on purpose complementary: `confirm` uses `!now.isAfter(expiresAt
 | 7 | `public interface Clock`: the **port** for time. |
 | 14 | `Instant now();` is the one method: the current moment. Injecting it lets a test fix time (`MutableClock`), so an expired hold is tested without waiting. |
 
+File: `src/main/java/io/plainround/seatholds/domain/SeatStore.java`
+
+**Lines 1 to 10**
+
 ```java
- 1  package io.plainround.seatholds.domain;
- 2  
- 3  import java.util.List;
- 4  
- 5  /**
- 6   * Outbound port: where seat states live. This is where "a seat is sold at most once" is enforced:
- 7   * {@link #update} is a compare-and-set, so a write based on stale data cannot win. Every adapter
- 8   * must pass the same contract test.
- 9   */
-10  public interface SeatStore {
-11  
-12    /**
-13     * Reads a seat's current state.
-14     *
-15     * @param seat the seat
-16     * @return its state
-17     * @throws UnknownSeatException if the seat was never added
-18     */
-19    SeatState get(SeatId seat);
-20  
-21    /**
-22     * Moves a seat to a new state only if it is still in the state the caller read.
-23     *
-24     * @param seat the seat
-25     * @param expected the state the caller based its decision on
-26     * @param next the state to move to
-27     * @return true only if the seat was in {@code expected} and {@code next} was applied; false if
-28     *     someone else changed it first
-29     * @throws UnknownSeatException if the seat was never added
-30     */
-31    boolean update(SeatId seat, SeatState expected, SeatState next);
-32  
-33    /**
-34     * Adds a seat in the free state unless it already exists.
-35     *
-36     * @param seat the seat
-37     * @return true if it was added, false if it was already there
-38     */
-39    boolean add(SeatId seat);
-40  
-41    /**
-42     * Every seat the store knows, in id order.
-43     *
-44     * @return an immutable list
-45     */
-46    List<SeatId> seats();
-47  }
+package io.plainround.seatholds.domain;
+
+import java.util.List;
+
+/**
+ * Outbound port: where seat states live. This is where "a seat is sold at most once" is enforced:
+ * {@link #update} is a compare-and-set, so a write based on stale data cannot win. Every adapter
+ * must pass the same contract test.
+ */
+public interface SeatStore {
+```
+
+**Lines 12 to 19**
+
+```java
+  /**
+   * Reads a seat's current state.
+   *
+   * @param seat the seat
+   * @return its state
+   * @throws UnknownSeatException if the seat was never added
+   */
+  SeatState get(SeatId seat);
+```
+
+**Lines 21 to 31**
+
+```java
+  /**
+   * Moves a seat to a new state only if it is still in the state the caller read.
+   *
+   * @param seat the seat
+   * @param expected the state the caller based its decision on
+   * @param next the state to move to
+   * @return true only if the seat was in {@code expected} and {@code next} was applied; false if
+   *     someone else changed it first
+   * @throws UnknownSeatException if the seat was never added
+   */
+  boolean update(SeatId seat, SeatState expected, SeatState next);
+```
+
+**Lines 33 to 39**
+
+```java
+  /**
+   * Adds a seat in the free state unless it already exists.
+   *
+   * @param seat the seat
+   * @return true if it was added, false if it was already there
+   */
+  boolean add(SeatId seat);
+```
+
+**Lines 41 to 47**
+
+```java
+  /**
+   * Every seat the store knows, in id order.
+   *
+   * @return an immutable list
+   */
+  List<SeatId> seats();
+}
 ```
 
 | Lines | What they do |
@@ -353,70 +504,94 @@ The boundary is on purpose complementary: `confirm` uses `!now.isAfter(expiresAt
 | 39 | `boolean add(SeatId seat);` adds a free seat unless it exists; returns whether it added one. |
 | 46 | `List<SeatId> seats();` lists every seat, in id order. |
 
+File: `src/main/java/io/plainround/seatholds/domain/UnknownSeatException.java`
+
+**Lines 1 to 6**
+
 ```java
- 1  package io.plainround.seatholds.domain;
- 2  
- 3  /** The caller named a seat the store has never been given. */
- 4  public final class UnknownSeatException extends RuntimeException {
- 5  
- 6    private static final long serialVersionUID = 1L;
- 7  
- 8    /**
- 9     * Creates the exception.
-10     *
-11     * @param seat the unknown seat
-12     */
-13    public UnknownSeatException(SeatId seat) {
-14      super("unknown seat: " + seat);
-15    }
-16  }
+package io.plainround.seatholds.domain;
+
+/** The caller named a seat the store has never been given. */
+public final class UnknownSeatException extends RuntimeException {
+
+  private static final long serialVersionUID = 1L;
+```
+
+**Lines 8 to 16**
+
+```java
+  /**
+   * Creates the exception.
+   *
+   * @param seat the unknown seat
+   */
+  public UnknownSeatException(SeatId seat) {
+    super("unknown seat: " + seat);
+  }
+}
 ```
 
 A named error. Line 4: a `final` class extending `RuntimeException` (unchecked). Line 6: the `serialVersionUID` constant that `-Xlint:all` asks for. Lines 13-15: the constructor takes the `SeatId` and calls `super("unknown seat: " + seat)`, storing the message in the parent class.
 
+File: `src/main/java/io/plainround/seatholds/domain/SeatStoreException.java`
+
+**Lines 1 to 6**
+
 ```java
- 1  package io.plainround.seatholds.domain;
- 2  
- 3  /** The store could not be reached or answered with an error; the seat's state is unknown. */
- 4  public final class SeatStoreException extends RuntimeException {
- 5  
- 6    private static final long serialVersionUID = 1L;
- 7  
- 8    /**
- 9     * Creates the exception.
-10     *
-11     * @param message what the store was asked to do
-12     * @param cause the underlying failure
-13     */
-14    public SeatStoreException(String message, Throwable cause) {
-15      super(message, cause);
-16    }
-17  }
+package io.plainround.seatholds.domain;
+
+/** The store could not be reached or answered with an error; the seat's state is unknown. */
+public final class SeatStoreException extends RuntimeException {
+
+  private static final long serialVersionUID = 1L;
+```
+
+**Lines 8 to 17**
+
+```java
+  /**
+   * Creates the exception.
+   *
+   * @param message what the store was asked to do
+   * @param cause the underlying failure
+   */
+  public SeatStoreException(String message, Throwable cause) {
+    super(message, cause);
+  }
+}
 ```
 
 The same, with a **cause**: the constructor (lines 14-16) takes a message and the underlying `Throwable` and calls `super(message, cause)`, so the original database error is kept and shown in the stack trace. It means "the store could not be reached or answered with an error", so the seat's state is unknown.
 
 ### `application/`: the inbound ports and the service
 
+File: `src/main/java/io/plainround/seatholds/application/HoldSeats.java`
+
+**Lines 1 to 8**
+
 ```java
- 1  package io.plainround.seatholds.application;
- 2  
- 3  import io.plainround.seatholds.domain.CustomerId;
- 4  import io.plainround.seatholds.domain.Outcome;
- 5  import io.plainround.seatholds.domain.SeatId;
- 6  
- 7  /** Inbound port: a customer wants a seat held. Called by an adapter; never calls out to one. */
- 8  public interface HoldSeats {
- 9  
-10    /**
-11     * Holds a seat for a customer.
-12     *
-13     * @param seat the seat
-14     * @param customer who wants it
-15     * @return the new state, or why the seat cannot be held
-16     */
-17    Outcome hold(SeatId seat, CustomerId customer);
-18  }
+package io.plainround.seatholds.application;
+
+import io.plainround.seatholds.domain.CustomerId;
+import io.plainround.seatholds.domain.Outcome;
+import io.plainround.seatholds.domain.SeatId;
+
+/** Inbound port: a customer wants a seat held. Called by an adapter; never calls out to one. */
+public interface HoldSeats {
+```
+
+**Lines 10 to 18**
+
+```java
+  /**
+   * Holds a seat for a customer.
+   *
+   * @param seat the seat
+   * @param customer who wants it
+   * @return the new state, or why the seat cannot be held
+   */
+  Outcome hold(SeatId seat, CustomerId customer);
+}
 ```
 
 | Lines | What they do |
@@ -425,145 +600,239 @@ The same, with a **cause**: the constructor (lines 14-16) takes a message and th
 | 8 | `public interface HoldSeats`: an **inbound port**, a thing callers (the command line, a test, later an HTTP handler) can call into. |
 | 17 | `Outcome hold(SeatId seat, CustomerId customer);` has no body: it says what a caller wants (hold this seat for this customer) and what comes back (`Success` with the new state, or a `Reason`). |
 
-`ConfirmHold` has the same shape with the method `Outcome confirm(SeatId seat, CustomerId customer)`.
+File: `src/main/java/io/plainround/seatholds/application/ConfirmHold.java`
+
+**Lines 1 to 8**
 
 ```java
- 1  package io.plainround.seatholds.application;
- 2  
- 3  import io.plainround.seatholds.domain.Outcome;
- 4  import io.plainround.seatholds.domain.SeatId;
- 5  
- 6  /** Inbound port: free holds whose time has run out. Called by a scheduler. */
- 7  public interface ExpireHolds {
- 8  
- 9    /**
-10     * Sweeps all seats once.
-11     *
-12     * @return how many holds were released
-13     */
-14    int sweep();
-15  
-16    /**
-17     * Releases one seat's hold if, and only if, it has expired.
-18     *
-19     * @param seat the seat
-20     * @return the freed seat, or why it was left alone
-21     */
-22    Outcome release(SeatId seat);
-23  }
+package io.plainround.seatholds.application;
+
+import io.plainround.seatholds.domain.CustomerId;
+import io.plainround.seatholds.domain.Outcome;
+import io.plainround.seatholds.domain.SeatId;
+
+/** Inbound port: a customer turns their hold into a sale. */
+public interface ConfirmHold {
+```
+
+**Lines 10 to 18**
+
+```java
+  /**
+   * Confirms a hold.
+   *
+   * @param seat the seat
+   * @param customer who holds it
+   * @return the sold state, or why it cannot be confirmed
+   */
+  Outcome confirm(SeatId seat, CustomerId customer);
+}
+```
+
+| Lines | What they do |
+| --- | --- |
+| 1 | `package ...application;`: the application layer. |
+| 3-5 | Imports `CustomerId`, `Outcome` and `SeatId` from the domain layer (application may depend on domain, never the reverse; `archunit.md`). |
+| 7 | A one-line Javadoc comment: "Inbound port: a customer turns their hold into a sale." |
+| 8 | `public interface ConfirmHold`: an **inbound port** with one method, the same shape as `HoldSeats`. |
+| 10-16 | The Javadoc of the method; `@param` documents each argument and `@return` what comes back. |
+| 17 | `Outcome confirm(SeatId seat, CustomerId customer);` has no body. It says what a caller wants (confirm this seat for this customer) and what comes back: a `Success` carrying the new `Sold` state, or a `Reason` explaining the refusal. |
+
+File: `src/main/java/io/plainround/seatholds/application/ExpireHolds.java`
+
+**Lines 1 to 7**
+
+```java
+package io.plainround.seatholds.application;
+
+import io.plainround.seatholds.domain.Outcome;
+import io.plainround.seatholds.domain.SeatId;
+
+/** Inbound port: free holds whose time has run out. Called by a scheduler. */
+public interface ExpireHolds {
+```
+
+**Lines 9 to 14**
+
+```java
+  /**
+   * Sweeps all seats once.
+   *
+   * @return how many holds were released
+   */
+  int sweep();
+```
+
+**Lines 16 to 23**
+
+```java
+  /**
+   * Releases one seat's hold if, and only if, it has expired.
+   *
+   * @param seat the seat
+   * @return the freed seat, or why it was left alone
+   */
+  Outcome release(SeatId seat);
+}
 ```
 
 Line 7 declares the third inbound port. Line 14, `int sweep();`, frees every expired hold in one pass and returns how many. Line 22, `Outcome release(SeatId seat);`, releases one seat if, and only if, its hold has expired (the race driver and `sweep` use it).
 
+File: `src/main/java/io/plainround/seatholds/application/SeatHoldService.java`
+
+**Lines 1 to 14**
+
 ```java
-  1  package io.plainround.seatholds.application;
-  2  
-  3  import io.plainround.seatholds.domain.Clock;
-  4  import io.plainround.seatholds.domain.CustomerId;
-  5  import io.plainround.seatholds.domain.Outcome;
-  6  import io.plainround.seatholds.domain.Outcome.Reason;
-  7  import io.plainround.seatholds.domain.Outcome.Success;
-  8  import io.plainround.seatholds.domain.SeatId;
-  9  import io.plainround.seatholds.domain.SeatState;
- 10  import io.plainround.seatholds.domain.SeatStore;
- 11  import io.plainround.seatholds.domain.SeatTransitions;
- 12  import java.lang.System.Logger;
- 13  import java.lang.System.Logger.Level;
- 14  import java.time.Duration;
- 15  import java.util.function.Function;
- 16  
- 17  /**
- 18   * The use cases. Each reads the seat, asks a pure transition what should happen, and writes the
- 19   * result through the store's compare-and-set. If the write loses a race, it reads again and decides
- 20   * again; a state that changed under it may make a different transition right, or none.
- 21   */
- 22  public final class SeatHoldService implements HoldSeats, ConfirmHold, ExpireHolds {
- 23  
- 24    private static final Logger LOG = System.getLogger(SeatHoldService.class.getName());
- 25    private static final int MAX_ATTEMPTS = 5;
- 26  
- 27    private final SeatStore store;
- 28    private final Clock clock;
- 29    private final Duration holdFor;
- 30  
- 31    /**
- 32     * Creates the service.
- 33     *
- 34     * @param store where seats live
- 35     * @param clock the time source
- 36     * @param holdFor how long a hold lasts
- 37     */
- 38    public SeatHoldService(SeatStore store, Clock clock, Duration holdFor) {
- 39      this.store = store;
- 40      this.clock = clock;
- 41      this.holdFor = holdFor;
- 42    }
- 43  
- 44    @Override
- 45    public Outcome hold(SeatId seat, CustomerId customer) {
- 46      Outcome outcome =
- 47          decideAndWrite(seat, current -> SeatTransitions.hold(current, customer, clock, holdFor));
- 48      log("hold", seat, customer, outcome);
- 49      return outcome;
- 50    }
- 51  
- 52    @Override
- 53    public Outcome confirm(SeatId seat, CustomerId customer) {
- 54      Outcome outcome =
- 55          decideAndWrite(seat, current -> SeatTransitions.confirm(current, customer, clock));
- 56      log("confirm", seat, customer, outcome);
- 57      return outcome;
- 58    }
- 59  
- 60    @Override
- 61    public int sweep() {
- 62      int released = 0;
- 63      for (SeatId seat : store.seats()) {
- 64        if (release(seat) instanceof Success) {
- 65          released++;
- 66        }
- 67      }
- 68      return released;
- 69    }
- 70  
- 71    @Override
- 72    public Outcome release(SeatId seat) {
- 73      Outcome outcome = decideAndWrite(seat, current -> SeatTransitions.release(current, clock));
- 74      if (outcome instanceof Success) {
- 75        LOG.log(Level.INFO, "event=released seat={0}", seat);
- 76      }
- 77      return outcome;
- 78    }
- 79  
- 80    private Outcome decideAndWrite(SeatId seat, Function<SeatState, Outcome> transition) {
- 81      for (int attempt = 0; attempt < MAX_ATTEMPTS; attempt++) {
- 82        SeatState current = store.get(seat);
- 83        Outcome outcome = transition.apply(current);
- 84        if (!(outcome instanceof Success success)) {
- 85          return outcome;
- 86        }
- 87        if (store.update(seat, current, success.newState())) {
- 88          return outcome;
- 89        }
- 90      }
- 91      return new Reason("seat is contended, try again");
- 92    }
- 93  
- 94    /** Successes are INFO; a refusal is routine under contention, so it is DEBUG (FINE). */
- 95    private static void log(String action, SeatId seat, CustomerId customer, Outcome outcome) {
- 96      if (outcome instanceof Reason reason) {
- 97        LOG.log(
- 98            Level.DEBUG,
- 99            "event={0} seat={1} customer={2} outcome=refused reason=\"{3}\"",
-100            action,
-101            seat,
-102            customer,
-103            reason.message());
-104      } else {
-105        LOG.log(Level.INFO, "event={0} seat={1} customer={2} outcome=ok", action, seat, customer);
-106      }
-107    }
-108  }
+package io.plainround.seatholds.application;
+
+import io.plainround.seatholds.domain.Clock;
+import io.plainround.seatholds.domain.CustomerId;
+import io.plainround.seatholds.domain.Outcome;
+import io.plainround.seatholds.domain.Outcome.Reason;
+import io.plainround.seatholds.domain.Outcome.Success;
+import io.plainround.seatholds.domain.SeatId;
+import io.plainround.seatholds.domain.SeatState;
+import io.plainround.seatholds.domain.SeatStore;
+import io.plainround.seatholds.domain.SeatTransitions;
+import java.lang.System.Logger;
+import java.lang.System.Logger.Level;
+import java.time.Duration;
+```
+
+**Lines 15 to 22**
+
+```java
+import java.util.function.Function;
+
+/**
+ * The use cases. Each reads the seat, asks a pure transition what should happen, and writes the
+ * result through the store's compare-and-set. If the write loses a race, it reads again and decides
+ * again; a state that changed under it may make a different transition right, or none.
+ */
+public final class SeatHoldService implements HoldSeats, ConfirmHold, ExpireHolds {
+```
+
+**Lines 24 to 29**
+
+```java
+  private static final Logger LOG = System.getLogger(SeatHoldService.class.getName());
+  private static final int MAX_ATTEMPTS = 5;
+
+  private final SeatStore store;
+  private final Clock clock;
+  private final Duration holdFor;
+```
+
+**Lines 31 to 42**
+
+```java
+  /**
+   * Creates the service.
+   *
+   * @param store where seats live
+   * @param clock the time source
+   * @param holdFor how long a hold lasts
+   */
+  public SeatHoldService(SeatStore store, Clock clock, Duration holdFor) {
+    this.store = store;
+    this.clock = clock;
+    this.holdFor = holdFor;
+  }
+```
+
+**Lines 44 to 50**
+
+```java
+  @Override
+  public Outcome hold(SeatId seat, CustomerId customer) {
+    Outcome outcome =
+        decideAndWrite(seat, current -> SeatTransitions.hold(current, customer, clock, holdFor));
+    log("hold", seat, customer, outcome);
+    return outcome;
+  }
+```
+
+**Lines 52 to 58**
+
+```java
+  @Override
+  public Outcome confirm(SeatId seat, CustomerId customer) {
+    Outcome outcome =
+        decideAndWrite(seat, current -> SeatTransitions.confirm(current, customer, clock));
+    log("confirm", seat, customer, outcome);
+    return outcome;
+  }
+```
+
+**Lines 60 to 69**
+
+```java
+  @Override
+  public int sweep() {
+    int released = 0;
+    for (SeatId seat : store.seats()) {
+      if (release(seat) instanceof Success) {
+        released++;
+      }
+    }
+    return released;
+  }
+```
+
+**Lines 71 to 78**
+
+```java
+  @Override
+  public Outcome release(SeatId seat) {
+    Outcome outcome = decideAndWrite(seat, current -> SeatTransitions.release(current, clock));
+    if (outcome instanceof Success) {
+      LOG.log(Level.INFO, "event=released seat={0}", seat);
+    }
+    return outcome;
+  }
+```
+
+**Lines 80 to 92**
+
+```java
+  private Outcome decideAndWrite(SeatId seat, Function<SeatState, Outcome> transition) {
+    for (int attempt = 0; attempt < MAX_ATTEMPTS; attempt++) {
+      SeatState current = store.get(seat);
+      Outcome outcome = transition.apply(current);
+      if (!(outcome instanceof Success success)) {
+        return outcome;
+      }
+      if (store.update(seat, current, success.newState())) {
+        return outcome;
+      }
+    }
+    return new Reason("seat is contended, try again");
+  }
+```
+
+**Lines 94 to 106**
+
+```java
+  /** Successes are INFO; a refusal is routine under contention, so it is DEBUG (FINE). */
+  private static void log(String action, SeatId seat, CustomerId customer, Outcome outcome) {
+    if (outcome instanceof Reason reason) {
+      LOG.log(
+          Level.DEBUG,
+          "event={0} seat={1} customer={2} outcome=refused reason=\"{3}\"",
+          action,
+          seat,
+          customer,
+          reason.message());
+    } else {
+      LOG.log(Level.INFO, "event={0} seat={1} customer={2} outcome=ok", action, seat, customer);
+    }
+```
+
+**Lines 107 to 108**
+
+```java
+  }
+}
 ```
 
 | Lines | What they do |
@@ -585,67 +854,162 @@ Line 7 declares the third inbound port. Line 14, `int sweep();`, frees every exp
 
 - `application/simulation/` (the race drivers), `infrastructure/memory/` (the in-memory store and the counter-example), `infrastructure/scheduling/ScheduledSweeper.java` and `interfaces/cli/Main.java` (the shutdown hook): `java-concurrency.md`.
 - `infrastructure/jdbc/` and `sql/`: `jdbc.md`, `hikaricp.md`, `sql.md`, `postgresql.md`.
-- `infrastructure/time/SystemClock.java` is one method, `return Instant.now();`, the real clock.
-- `interfaces/cli/Logging.java`, `ConfigurationException.java`, `AppConfig.java`: `java-logging.md`, `environment-variables.md`.
+- `interfaces/cli/Logging.java`: `java-logging.md`. `interfaces/cli/AppConfig.java`: `environment-variables.md`.
+
+### `infrastructure/time/SystemClock.java`: the real clock
+
+File: `src/main/java/io/plainround/seatholds/infrastructure/time/SystemClock.java`
+
+**Lines 1 to 7**
+
+```java
+package io.plainround.seatholds.infrastructure.time;
+
+import io.plainround.seatholds.domain.Clock;
+import java.time.Instant;
+
+/** The real clock. Tests use a fixed one instead. */
+public final class SystemClock implements Clock {
+```
+
+**Lines 9 to 13**
+
+```java
+  @Override
+  public Instant now() {
+    return Instant.now();
+  }
+}
+```
+
+| Lines | What they do |
+| --- | --- |
+| 1 | `package ...infrastructure.time;`: the infrastructure layer, sub-package `time`. |
+| 3-4 | Imports the domain's `Clock` interface and Java's `Instant` (one exact moment on the timeline). |
+| 6 | A Javadoc comment: "The real clock. Tests use a fixed one instead." |
+| 7 | `public final class SystemClock implements Clock`: the class promises to supply the one method of the domain's `Clock` interface. The domain asks "what time is it?" through the interface and never learns that this class exists. |
+| 9 | `@Override`: tells the compiler this method replaces one declared in the interface; a typo in the name becomes a compile error. |
+| 10-12 | `public Instant now() { return Instant.now(); }`: ask the computer's clock for the current moment and return it. Because the time comes in through the interface, tests give the service a `MutableClock` (`junit-test-walkthrough.md`) whose time they control. |
+
+### `interfaces/cli/ConfigurationException.java`: a named error for bad settings
+
+File: `src/main/java/io/plainround/seatholds/interfaces/cli/ConfigurationException.java`
+
+**Lines 1 to 6**
+
+```java
+package io.plainround.seatholds.interfaces.cli;
+
+/** An environment variable holds a value the program cannot use. */
+public final class ConfigurationException extends RuntimeException {
+
+  private static final long serialVersionUID = 1L;
+```
+
+**Lines 8 to 16**
+
+```java
+  /**
+   * Creates the exception.
+   *
+   * @param message which variable is wrong and what is expected
+   */
+  public ConfigurationException(String message) {
+    super(message);
+  }
+}
+```
+
+| Lines | What they do |
+| --- | --- |
+| 1 | `package ...;` puts the class in the command-line package. |
+| 3 | A one-line Javadoc comment (`/** ... */`): documentation for people, ignored by the compiler. It says what the error means: an environment variable holds a value the program cannot use. |
+| 4 | `public final class ConfigurationException extends RuntimeException`: a new error type. `public` lets other packages use it; `final` forbids subclasses; `extends RuntimeException` makes it an **unchecked** exception: the compiler does not force callers to write `try/catch` for it. |
+| 5 | A blank line. |
+| 6 | `private static final long serialVersionUID = 1L;`: Java can turn an object into bytes (**serialization**), and exceptions are allowed to be serialized. This number is the version tag of that byte format. It is `private` (hidden), `static` (one value for the class), `final` (never changes), and `1L` is the number 1 as a `long` (the `L` says so). The compiler flag `-Xlint:all` with `-Werror` (`javac.md`) turns a missing one into a build failure, which is why it is here. |
+| 8-12 | A Javadoc comment for the constructor; `@param message` documents the argument: which variable is wrong and what is expected. |
+| 13 | `public ConfigurationException(String message)`: the constructor takes the text of the message. |
+| 14 | `super(message);` hands the text to `RuntimeException`, which stores it; `getMessage()` returns it later. |
+| 15-16 | The closing braces of the constructor and the class. |
 
 ### `interfaces/cli/Application.java`: the composition root
 
+File: `src/main/java/io/plainround/seatholds/interfaces/cli/Application.java`
+
+**Lines 1 to 11**
+
 ```java
- 1  package io.plainround.seatholds.interfaces.cli;
- 2  
- 3  import io.plainround.seatholds.application.SeatHoldService;
- 4  import io.plainround.seatholds.domain.SeatId;
- 5  import io.plainround.seatholds.domain.SeatStore;
- 6  import io.plainround.seatholds.domain.SeatStoreException;
- 7  import io.plainround.seatholds.infrastructure.jdbc.JdbcSeatStore;
- 8  import io.plainround.seatholds.infrastructure.memory.InMemorySeatStore;
- 9  import io.plainround.seatholds.infrastructure.time.SystemClock;
-10  import java.util.List;
-11  import java.util.stream.IntStream;
-12  
-13  /** The composition root: builds the chosen store and the service, and closes what it opened. */
-14  final class Application implements AutoCloseable {
-15  
-16    private final AutoCloseable resource;
-17    private final SeatStore store;
-18    private final SeatHoldService service;
-19    private final List<SeatId> seatIds;
-20  
-21    Application(AppConfig config) {
-22      if (config.store() == AppConfig.StoreKind.JDBC) {
-23        JdbcSeatStore jdbc = JdbcSeatStore.open(config.database());
-24        store = jdbc;
-25        resource = jdbc;
-26      } else {
-27        store = new InMemorySeatStore();
-28        resource = () -> {};
-29      }
-30      seatIds = IntStream.rangeClosed(1, config.seats()).mapToObj(n -> new SeatId("s-" + n)).toList();
-31      seatIds.forEach(store::add);
-32      service = new SeatHoldService(store, new SystemClock(), config.holdFor());
-33    }
-34  
-35    SeatStore store() {
-36      return store;
-37    }
-38  
-39    SeatHoldService service() {
-40      return service;
-41    }
-42  
-43    List<SeatId> seatIds() {
-44      return seatIds;
-45    }
-46  
-47    @Override
-48    public void close() {
-49      try {
-50        resource.close();
-51      } catch (Exception failure) {
-52        throw new SeatStoreException("closing the store", failure);
-53      }
-54    }
-55  }
+package io.plainround.seatholds.interfaces.cli;
+
+import io.plainround.seatholds.application.SeatHoldService;
+import io.plainround.seatholds.domain.SeatId;
+import io.plainround.seatholds.domain.SeatStore;
+import io.plainround.seatholds.domain.SeatStoreException;
+import io.plainround.seatholds.infrastructure.jdbc.JdbcSeatStore;
+import io.plainround.seatholds.infrastructure.memory.InMemorySeatStore;
+import io.plainround.seatholds.infrastructure.time.SystemClock;
+import java.util.List;
+import java.util.stream.IntStream;
+```
+
+**Lines 13 to 19**
+
+```java
+/** The composition root: builds the chosen store and the service, and closes what it opened. */
+final class Application implements AutoCloseable {
+
+  private final AutoCloseable resource;
+  private final SeatStore store;
+  private final SeatHoldService service;
+  private final List<SeatId> seatIds;
+```
+
+**Lines 21 to 33**
+
+```java
+  Application(AppConfig config) {
+    if (config.store() == AppConfig.StoreKind.JDBC) {
+      JdbcSeatStore jdbc = JdbcSeatStore.open(config.database());
+      store = jdbc;
+      resource = jdbc;
+    } else {
+      store = new InMemorySeatStore();
+      resource = () -> {};
+    }
+    seatIds = IntStream.rangeClosed(1, config.seats()).mapToObj(n -> new SeatId("s-" + n)).toList();
+    seatIds.forEach(store::add);
+    service = new SeatHoldService(store, new SystemClock(), config.holdFor());
+  }
+```
+
+**Lines 35 to 41**
+
+```java
+  SeatStore store() {
+    return store;
+  }
+
+  SeatHoldService service() {
+    return service;
+  }
+```
+
+**Lines 43 to 55**
+
+```java
+  List<SeatId> seatIds() {
+    return seatIds;
+  }
+
+  @Override
+  public void close() {
+    try {
+      resource.close();
+    } catch (Exception failure) {
+      throw new SeatStoreException("closing the store", failure);
+    }
+  }
+}
 ```
 
 | Lines | What they do |
@@ -659,84 +1023,115 @@ Line 7 declares the third inbound port. Line 14, `int sweep();`, frees every exp
 
 ### `interfaces/cli/AppConfig.java`
 
+File: `src/main/java/io/plainround/seatholds/interfaces/cli/AppConfig.java`
+
+**Lines 1 to 7**
+
 ```java
- 1  package io.plainround.seatholds.interfaces.cli;
- 2  
- 3  import io.plainround.seatholds.infrastructure.jdbc.DatabaseSettings;
- 4  import java.time.Duration;
- 5  import java.time.format.DateTimeParseException;
- 6  import java.util.Locale;
- 7  import java.util.Map;
- 8  
- 9  /**
-10   * Settings read from the environment and validated once at start-up; see {@code .env.example}.
-11   *
-12   * @param store which adapter holds the seats
-13   * @param database where the database is; present only for the JDBC store
-14   * @param holdFor how long a hold lasts
-15   * @param sweepEvery the delay between expiry sweeps
-16   * @param seats how many seats {@code s-1} to {@code s-N} the store is given at start-up
-17   * @param logLevel the lowest log level written to standard error
-18   */
-19  public record AppConfig(
-20      StoreKind store,
-21      DatabaseSettings database,
-22      Duration holdFor,
-23      Duration sweepEvery,
-24      int seats,
-25      String logLevel) {
-26  
-27    /** The seat store adapters. */
-28    public enum StoreKind {
-29      /** A concurrent map in this process. */
-30      MEMORY,
-31      /** PostgreSQL through JDBC. */
-32      JDBC
-33    }
-34  
-35    /**
-36     * Reads and validates the settings.
-37     *
-38     * @param env the environment variables
-39     * @return the validated settings
-40     * @throws ConfigurationException if a value is malformed or out of range
-41     */
-42    public static AppConfig from(Map<String, String> env) {
-43      try {
-44        StoreKind store =
-45            StoreKind.valueOf(env.getOrDefault("STORE", "memory").toUpperCase(Locale.ROOT));
-46        DatabaseSettings database =
-47            store == StoreKind.JDBC
-48                ? new DatabaseSettings(
-49                    env.get("DATABASE_URL"),
-50                    env.get("DATABASE_USER"),
-51                    env.get("DATABASE_PASSWORD"),
-52                    Integer.parseInt(env.getOrDefault("POOL_SIZE", "16")),
-53                    positive("CONNECTION_TIMEOUT", env.getOrDefault("CONNECTION_TIMEOUT", "PT30S")))
-54                : null;
-55        Duration holdFor = positive("HOLD_DURATION", env.getOrDefault("HOLD_DURATION", "PT10M"));
-56        Duration sweepEvery = positive("SWEEP_INTERVAL", env.getOrDefault("SWEEP_INTERVAL", "PT30S"));
-57        int seats = Integer.parseInt(env.getOrDefault("SEATS", "10"));
-58        if (seats < 1) {
-59          throw new IllegalArgumentException("SEATS must be at least 1, was " + seats);
-60        }
-61        String level = env.getOrDefault("LOG_LEVEL", "INFO").toUpperCase(Locale.ROOT);
-62        Logging.requireKnownLevel(level);
-63        return new AppConfig(store, database, holdFor, sweepEvery, seats, level);
-64      } catch (DateTimeParseException | IllegalArgumentException problem) {
-65        throw new ConfigurationException("invalid configuration: " + problem.getMessage());
-66      }
-67    }
-68  
-69    private static Duration positive(String name, String text) {
-70      Duration duration = Duration.parse(text);
-71      if (duration.isZero() || duration.isNegative()) {
-72        throw new IllegalArgumentException(
-73            name + " must be a positive ISO-8601 duration, was " + text);
-74      }
-75      return duration;
-76    }
-77  }
+package io.plainround.seatholds.interfaces.cli;
+
+import io.plainround.seatholds.infrastructure.jdbc.DatabaseSettings;
+import java.time.Duration;
+import java.time.format.DateTimeParseException;
+import java.util.Locale;
+import java.util.Map;
+```
+
+**Lines 9 to 21**
+
+```java
+/**
+ * Settings read from the environment and validated once at start-up; see {@code .env.example}.
+ *
+ * @param store which adapter holds the seats
+ * @param database where the database is; present only for the JDBC store
+ * @param holdFor how long a hold lasts
+ * @param sweepEvery the delay between expiry sweeps
+ * @param seats how many seats {@code s-1} to {@code s-N} the store is given at start-up
+ * @param logLevel the lowest log level written to standard error
+ */
+public record AppConfig(
+    StoreKind store,
+    DatabaseSettings database,
+```
+
+**Lines 22 to 33**
+
+```java
+    Duration holdFor,
+    Duration sweepEvery,
+    int seats,
+    String logLevel) {
+
+  /** The seat store adapters. */
+  public enum StoreKind {
+    /** A concurrent map in this process. */
+    MEMORY,
+    /** PostgreSQL through JDBC. */
+    JDBC
+  }
+```
+
+**Lines 35 to 47**
+
+```java
+  /**
+   * Reads and validates the settings.
+   *
+   * @param env the environment variables
+   * @return the validated settings
+   * @throws ConfigurationException if a value is malformed or out of range
+   */
+  public static AppConfig from(Map<String, String> env) {
+    try {
+      StoreKind store =
+          StoreKind.valueOf(env.getOrDefault("STORE", "memory").toUpperCase(Locale.ROOT));
+      DatabaseSettings database =
+          store == StoreKind.JDBC
+```
+
+**Lines 48 to 61**
+
+```java
+              ? new DatabaseSettings(
+                  env.get("DATABASE_URL"),
+                  env.get("DATABASE_USER"),
+                  env.get("DATABASE_PASSWORD"),
+                  Integer.parseInt(env.getOrDefault("POOL_SIZE", "16")),
+                  positive("CONNECTION_TIMEOUT", env.getOrDefault("CONNECTION_TIMEOUT", "PT30S")))
+              : null;
+      Duration holdFor = positive("HOLD_DURATION", env.getOrDefault("HOLD_DURATION", "PT10M"));
+      Duration sweepEvery = positive("SWEEP_INTERVAL", env.getOrDefault("SWEEP_INTERVAL", "PT30S"));
+      int seats = Integer.parseInt(env.getOrDefault("SEATS", "10"));
+      if (seats < 1) {
+        throw new IllegalArgumentException("SEATS must be at least 1, was " + seats);
+      }
+      String level = env.getOrDefault("LOG_LEVEL", "INFO").toUpperCase(Locale.ROOT);
+```
+
+**Lines 62 to 67**
+
+```java
+      Logging.requireKnownLevel(level);
+      return new AppConfig(store, database, holdFor, sweepEvery, seats, level);
+    } catch (DateTimeParseException | IllegalArgumentException problem) {
+      throw new ConfigurationException("invalid configuration: " + problem.getMessage());
+    }
+  }
+```
+
+**Lines 69 to 77**
+
+```java
+  private static Duration positive(String name, String text) {
+    Duration duration = Duration.parse(text);
+    if (duration.isZero() || duration.isNegative()) {
+      throw new IllegalArgumentException(
+          name + " must be a positive ISO-8601 duration, was " + text);
+    }
+    return duration;
+  }
+}
 ```
 
 | Lines | What they do |
@@ -757,196 +1152,270 @@ Line 7 declares the third inbound port. Line 14, `int sweep();`, frees every exp
 
 ### `interfaces/cli/Cli.java`
 
+File: `src/main/java/io/plainround/seatholds/interfaces/cli/Cli.java`
+
+**Lines 1 to 14**
+
 ```java
-  1  package io.plainround.seatholds.interfaces.cli;
-  2  
-  3  import io.plainround.seatholds.application.simulation.HoldRace;
-  4  import io.plainround.seatholds.application.simulation.RaceResult;
-  5  import io.plainround.seatholds.domain.CustomerId;
-  6  import io.plainround.seatholds.domain.Outcome;
-  7  import io.plainround.seatholds.domain.Outcome.Success;
-  8  import io.plainround.seatholds.domain.SeatId;
-  9  import io.plainround.seatholds.domain.SeatStoreException;
- 10  import io.plainround.seatholds.domain.UnknownSeatException;
- 11  import io.plainround.seatholds.infrastructure.scheduling.ScheduledSweeper;
- 12  import java.io.PrintStream;
- 13  import java.time.Instant;
- 14  import java.util.List;
- 15  import java.util.Locale;
- 16  import java.util.Map;
- 17  import java.util.concurrent.CountDownLatch;
- 18  import java.util.stream.IntStream;
- 19  
- 20  /** Command-line driver: parses arguments, calls the use cases, prints results. */
- 21  public final class Cli {
- 22  
- 23    private static final String USAGE =
- 24        """
- 25        usage: seatholds <command>
- 26          scenario                   the lesson's scenarios on the configured store, and the failure they guard against
- 27          hold <seat> <customer>     hold a seat (it lasts HOLD_DURATION)
- 28          confirm <seat> <customer>  turn a hold into a sale
- 29          status                     print every seat's state
- 30          sweep                      free every expired hold once
- 31          race [runs] [customers]    race customers for 10 fresh seats; default 5 runs of 1000
- 32          serve                      sweep every SWEEP_INTERVAL until interrupted, then stop cleanly
- 33          health                     check the configuration and the store, exit 0 when usable
- 34          help                       print this text
- 35        settings come from the environment: STORE=memory|jdbc, DATABASE_URL, DATABASE_USER, ... (see .env.example)
- 36        """;
- 37  
- 38    private final Map<String, String> env;
- 39    private final PrintStream out;
- 40    private final PrintStream err;
- 41    private final CountDownLatch shutdown;
- 42  
- 43    /**
- 44     * Creates a driver.
- 45     *
- 46     * @param env environment variables
- 47     * @param out standard output
- 48     * @param err standard error
- 49     * @param shutdown counted down by the process's shutdown signal; {@code serve} runs until then
- 50     */
- 51    public Cli(Map<String, String> env, PrintStream out, PrintStream err, CountDownLatch shutdown) {
- 52      this.env = env;
- 53      this.out = out;
- 54      this.err = err;
- 55      this.shutdown = shutdown;
- 56    }
- 57  
- 58    /**
- 59     * Runs one command.
- 60     *
- 61     * @param args the command line
- 62     * @return the exit code: 0 on success, 1 when a check or invariant fails or the store is
- 63     *     unavailable, 2 on bad usage or settings
- 64     */
- 65    public int run(String... args) {
- 66      String command = args.length == 0 ? "help" : args[0];
- 67      if (command.equals("help")) {
- 68        out.print(USAGE);
- 69        return 0;
- 70      }
- 71      AppConfig config;
- 72      try {
- 73        config = AppConfig.from(env);
- 74      } catch (ConfigurationException problem) {
- 75        err.println(problem.getMessage());
- 76        return 2;
- 77      }
- 78      Logging.configure(config.logLevel());
- 79      try (Application app = new Application(config)) {
- 80        return dispatch(command, args, config, app);
- 81      } catch (SeatStoreException problem) {
- 82        err.println("store unavailable: " + problem.getMessage() + ": " + problem.getCause());
- 83        return 1;
- 84      } catch (IllegalArgumentException problem) {
- 85        err.println(problem.getMessage());
- 86        return 2;
- 87      }
- 88    }
- 89  
- 90    private int dispatch(String command, String[] args, AppConfig config, Application app) {
- 91      try {
- 92        return switch (command) {
- 93          case "scenario" -> scenario(app);
- 94          case "hold" ->
- 95              twoArguments(args, (seat, customer) -> print(app.service().hold(seat, customer)));
- 96          case "confirm" ->
- 97              twoArguments(args, (seat, customer) -> print(app.service().confirm(seat, customer)));
- 98          case "status" -> status(app);
- 99          case "sweep" -> {
-100            out.println("released " + app.service().sweep() + " expired hold(s)");
-101            yield 0;
-102          }
-103          case "race" -> race(args, app);
-104          case "serve" -> serve(config, app);
-105          case "health" -> health(config, app);
-106          default -> {
-107            err.print(USAGE);
-108            yield 2;
-109          }
-110        };
-111      } catch (UnknownSeatException problem) {
-112        err.println(problem.getMessage());
-113        return 1;
-114      }
-115    }
-116  
-117    private int scenario(Application app) {
-118      String runId = Long.toString(Instant.now().toEpochMilli(), 36);
-119      boolean held = new Scenario(app.store(), app.service(), runId, out).run();
-120      return held ? 0 : 1;
-121    }
-122  
-123    private interface SeatAction {
-124      int run(SeatId seat, CustomerId customer);
-125    }
-126  
-127    private int twoArguments(String[] args, SeatAction action) {
-128      if (args.length != 3) {
-129        err.print(USAGE);
-130        return 2;
-131      }
-132      return action.run(new SeatId(args[1]), new CustomerId(args[2]));
-133    }
-134  
-135    private int print(Outcome outcome) {
-136      out.println(outcome);
-137      return outcome instanceof Success ? 0 : 1;
-138    }
-139  
-140    private int status(Application app) {
-141      for (SeatId seat : app.store().seats()) {
-142        out.println(seat + " " + app.store().get(seat));
-143      }
-144      return 0;
-145    }
-146  
-147    private int race(String[] args, Application app) {
-148      int runs = args.length > 1 ? Integer.parseInt(args[1]) : 5;
-149      int customers = args.length > 2 ? Integer.parseInt(args[2]) : 1_000;
-150      String runId = Long.toString(Instant.now().toEpochMilli(), 36);
-151      boolean held = true;
-152      for (int run = 1; run <= runs; run++) {
-153        String label = "race-" + run + "-" + runId;
-154        List<SeatId> seats =
-155            IntStream.rangeClosed(1, 10).mapToObj(n -> new SeatId(label + "-" + n)).toList();
-156        seats.forEach(app.store()::add);
-157        RaceResult result = new HoldRace(app.service()).run(seats, customers);
-158        out.println("race result: " + result);
-159        held &= result.wins() == Math.min(10, customers);
-160      }
-161      return held ? 0 : 1;
-162    }
-163  
-164    private int serve(AppConfig config, Application app) {
-165      ScheduledSweeper sweeper = new ScheduledSweeper(app.service(), config.sweepEvery());
-166      try {
-167        out.println(
-168            "serving: sweeping expired holds every " + config.sweepEvery() + "; Ctrl-C to stop");
-169        shutdown.await();
-170        out.println("stopping: finishing the sweep in progress");
-171        return 0;
-172      } catch (InterruptedException interrupted) {
-173        Thread.currentThread().interrupt();
-174        return 1;
-175      } finally {
-176        sweeper.close();
-177      }
-178    }
-179  
-180    private int health(AppConfig config, Application app) {
-181      app.store().seats();
-182      out.println(
-183          "ok store="
-184              + config.store().name().toLowerCase(Locale.ROOT)
-185              + " seats="
-186              + app.seatIds().size());
-187      return 0;
-188    }
-189  }
+package io.plainround.seatholds.interfaces.cli;
+
+import io.plainround.seatholds.application.simulation.HoldRace;
+import io.plainround.seatholds.application.simulation.RaceResult;
+import io.plainround.seatholds.domain.CustomerId;
+import io.plainround.seatholds.domain.Outcome;
+import io.plainround.seatholds.domain.Outcome.Success;
+import io.plainround.seatholds.domain.SeatId;
+import io.plainround.seatholds.domain.SeatStoreException;
+import io.plainround.seatholds.domain.UnknownSeatException;
+import io.plainround.seatholds.infrastructure.scheduling.ScheduledSweeper;
+import java.io.PrintStream;
+import java.time.Instant;
+import java.util.List;
+```
+
+**Lines 15 to 21**
+
+```java
+import java.util.Locale;
+import java.util.Map;
+import java.util.concurrent.CountDownLatch;
+import java.util.stream.IntStream;
+
+/** Command-line driver: parses arguments, calls the use cases, prints results. */
+public final class Cli {
+```
+
+**Lines 23 to 35**
+
+```java
+  private static final String USAGE =
+      """
+      usage: seatholds <command>
+        scenario                   the lesson's scenarios on the configured store, and the failure they guard against
+        hold <seat> <customer>     hold a seat (it lasts HOLD_DURATION)
+        confirm <seat> <customer>  turn a hold into a sale
+        status                     print every seat's state
+        sweep                      free every expired hold once
+        race [runs] [customers]    race customers for 10 fresh seats; default 5 runs of 1000
+        serve                      sweep every SWEEP_INTERVAL until interrupted, then stop cleanly
+        health                     check the configuration and the store, exit 0 when usable
+        help                       print this text
+      settings come from the environment: STORE=memory|jdbc, DATABASE_URL, DATABASE_USER, ... (see .env.example)
+```
+
+**Lines 36 to 41**
+
+```java
+      """;
+
+  private final Map<String, String> env;
+  private final PrintStream out;
+  private final PrintStream err;
+  private final CountDownLatch shutdown;
+```
+
+**Lines 43 to 55**
+
+```java
+  /**
+   * Creates a driver.
+   *
+   * @param env environment variables
+   * @param out standard output
+   * @param err standard error
+   * @param shutdown counted down by the process's shutdown signal; {@code serve} runs until then
+   */
+  public Cli(Map<String, String> env, PrintStream out, PrintStream err, CountDownLatch shutdown) {
+    this.env = env;
+    this.out = out;
+    this.err = err;
+    this.shutdown = shutdown;
+```
+
+**Lines 56 to 69**
+
+```java
+  }
+
+  /**
+   * Runs one command.
+   *
+   * @param args the command line
+   * @return the exit code: 0 on success, 1 when a check or invariant fails or the store is
+   *     unavailable, 2 on bad usage or settings
+   */
+  public int run(String... args) {
+    String command = args.length == 0 ? "help" : args[0];
+    if (command.equals("help")) {
+      out.print(USAGE);
+      return 0;
+```
+
+**Lines 70 to 83**
+
+```java
+    }
+    AppConfig config;
+    try {
+      config = AppConfig.from(env);
+    } catch (ConfigurationException problem) {
+      err.println(problem.getMessage());
+      return 2;
+    }
+    Logging.configure(config.logLevel());
+    try (Application app = new Application(config)) {
+      return dispatch(command, args, config, app);
+    } catch (SeatStoreException problem) {
+      err.println("store unavailable: " + problem.getMessage() + ": " + problem.getCause());
+      return 1;
+```
+
+**Lines 84 to 97**
+
+```java
+    } catch (IllegalArgumentException problem) {
+      err.println(problem.getMessage());
+      return 2;
+    }
+  }
+
+  private int dispatch(String command, String[] args, AppConfig config, Application app) {
+    try {
+      return switch (command) {
+        case "scenario" -> scenario(app);
+        case "hold" ->
+            twoArguments(args, (seat, customer) -> print(app.service().hold(seat, customer)));
+        case "confirm" ->
+            twoArguments(args, (seat, customer) -> print(app.service().confirm(seat, customer)));
+```
+
+**Lines 98 to 111**
+
+```java
+        case "status" -> status(app);
+        case "sweep" -> {
+          out.println("released " + app.service().sweep() + " expired hold(s)");
+          yield 0;
+        }
+        case "race" -> race(args, app);
+        case "serve" -> serve(config, app);
+        case "health" -> health(config, app);
+        default -> {
+          err.print(USAGE);
+          yield 2;
+        }
+      };
+    } catch (UnknownSeatException problem) {
+```
+
+**Lines 112 to 121**
+
+```java
+      err.println(problem.getMessage());
+      return 1;
+    }
+  }
+
+  private int scenario(Application app) {
+    String runId = Long.toString(Instant.now().toEpochMilli(), 36);
+    boolean held = new Scenario(app.store(), app.service(), runId, out).run();
+    return held ? 0 : 1;
+  }
+```
+
+**Lines 123 to 133**
+
+```java
+  private interface SeatAction {
+    int run(SeatId seat, CustomerId customer);
+  }
+
+  private int twoArguments(String[] args, SeatAction action) {
+    if (args.length != 3) {
+      err.print(USAGE);
+      return 2;
+    }
+    return action.run(new SeatId(args[1]), new CustomerId(args[2]));
+  }
+```
+
+**Lines 135 to 145**
+
+```java
+  private int print(Outcome outcome) {
+    out.println(outcome);
+    return outcome instanceof Success ? 0 : 1;
+  }
+
+  private int status(Application app) {
+    for (SeatId seat : app.store().seats()) {
+      out.println(seat + " " + app.store().get(seat));
+    }
+    return 0;
+  }
+```
+
+**Lines 147 to 159**
+
+```java
+  private int race(String[] args, Application app) {
+    int runs = args.length > 1 ? Integer.parseInt(args[1]) : 5;
+    int customers = args.length > 2 ? Integer.parseInt(args[2]) : 1_000;
+    String runId = Long.toString(Instant.now().toEpochMilli(), 36);
+    boolean held = true;
+    for (int run = 1; run <= runs; run++) {
+      String label = "race-" + run + "-" + runId;
+      List<SeatId> seats =
+          IntStream.rangeClosed(1, 10).mapToObj(n -> new SeatId(label + "-" + n)).toList();
+      seats.forEach(app.store()::add);
+      RaceResult result = new HoldRace(app.service()).run(seats, customers);
+      out.println("race result: " + result);
+      held &= result.wins() == Math.min(10, customers);
+```
+
+**Lines 160 to 173**
+
+```java
+    }
+    return held ? 0 : 1;
+  }
+
+  private int serve(AppConfig config, Application app) {
+    ScheduledSweeper sweeper = new ScheduledSweeper(app.service(), config.sweepEvery());
+    try {
+      out.println(
+          "serving: sweeping expired holds every " + config.sweepEvery() + "; Ctrl-C to stop");
+      shutdown.await();
+      out.println("stopping: finishing the sweep in progress");
+      return 0;
+    } catch (InterruptedException interrupted) {
+      Thread.currentThread().interrupt();
+```
+
+**Lines 174 to 187**
+
+```java
+      return 1;
+    } finally {
+      sweeper.close();
+    }
+  }
+
+  private int health(AppConfig config, Application app) {
+    app.store().seats();
+    out.println(
+        "ok store="
+            + config.store().name().toLowerCase(Locale.ROOT)
+            + " seats="
+            + app.seatIds().size());
+    return 0;
+```
+
+**Lines 188 to 189**
+
+```java
+  }
+}
 ```
 
 | Lines | What they do |
@@ -972,152 +1441,208 @@ Line 7 declares the third inbound port. Line 14, `int sweep();`, frees every exp
 
 ### `interfaces/cli/Scenario.java`
 
+File: `src/main/java/io/plainround/seatholds/interfaces/cli/Scenario.java`
+
+**Lines 1 to 14**
+
 ```java
-  1  package io.plainround.seatholds.interfaces.cli;
-  2  
-  3  import io.plainround.seatholds.application.SeatHoldService;
-  4  import io.plainround.seatholds.application.simulation.HoldRace;
-  5  import io.plainround.seatholds.application.simulation.RaceResult;
-  6  import io.plainround.seatholds.application.simulation.SweepConfirmRace;
-  7  import io.plainround.seatholds.domain.Clock;
-  8  import io.plainround.seatholds.domain.CustomerId;
-  9  import io.plainround.seatholds.domain.Outcome;
- 10  import io.plainround.seatholds.domain.SeatId;
- 11  import io.plainround.seatholds.domain.SeatState;
- 12  import io.plainround.seatholds.domain.SeatState.Free;
- 13  import io.plainround.seatholds.domain.SeatState.Held;
- 14  import io.plainround.seatholds.domain.SeatStore;
- 15  import io.plainround.seatholds.domain.SeatTransitions;
- 16  import io.plainround.seatholds.infrastructure.memory.PlainWriteSeatStore;
- 17  import java.io.PrintStream;
- 18  import java.time.Duration;
- 19  import java.time.Instant;
- 20  import java.util.List;
- 21  import java.util.stream.IntStream;
- 22  
- 23  /** The lesson's scenarios on whichever store is configured, then the failure they guard against. */
- 24  final class Scenario {
- 25  
- 26    private static final int RACE_RUNS = 5;
- 27    private static final int CUSTOMERS = 1_000;
- 28    private static final int SEATS = 10;
- 29    private static final int SWEEP_REPETITIONS = 100;
- 30    private static final Duration TEN_MINUTES = Duration.ofMinutes(10);
- 31  
- 32    private final SeatStore store;
- 33    private final SeatHoldService service;
- 34    private final String runId;
- 35    private final PrintStream out;
- 36  
- 37    Scenario(SeatStore store, SeatHoldService service, String runId, PrintStream out) {
- 38      this.store = store;
- 39      this.service = service;
- 40      this.runId = runId;
- 41      this.out = out;
- 42    }
- 43  
- 44    /**
- 45     * Runs every scenario.
- 46     *
- 47     * @return true if every invariant held
- 48     */
- 49    boolean run() {
- 50      confirmingAnExpiredHoldGivesAReason();
- 51      staleUpdateIsRejected();
- 52      boolean racesHeld = racesHaveExactlyTenWinners();
- 53      boolean sweepHeld = sweepVersusConfirm();
- 54      plainWriteSellsTwice();
- 55      return racesHeld && sweepHeld;
- 56    }
- 57  
- 58    private void confirmingAnExpiredHoldGivesAReason() {
- 59      Clock fixed = () -> Instant.parse("2026-01-01T00:00:00Z");
- 60      var expiredHold = new Held(new CustomerId("ada"), fixed.now().minus(Duration.ofMinutes(1)));
- 61      Outcome result = SeatTransitions.confirm(expiredHold, new CustomerId("ada"), fixed);
- 62      out.println("confirm expired hold -> " + result + "  (never Success)");
- 63    }
- 64  
- 65    private void staleUpdateIsRejected() {
- 66      SeatId seat = new SeatId("demo-" + runId);
- 67      store.add(seat);
- 68      Instant expiry = Instant.now().plus(TEN_MINUTES);
- 69      boolean first = store.update(seat, new Free(), new Held(new CustomerId("ada"), expiry));
- 70      boolean second = store.update(seat, new Free(), new Held(new CustomerId("bruno"), expiry));
- 71      out.println("first update: " + first + "  second update (stale expected): " + second);
- 72    }
- 73  
- 74    private boolean racesHaveExactlyTenWinners() {
- 75      boolean held = true;
- 76      for (int run = 1; run <= RACE_RUNS; run++) {
- 77        List<SeatId> seats = freshSeats("race-" + run);
- 78        RaceResult result = new HoldRace(service).run(seats, CUSTOMERS);
- 79        out.println("race result: " + result);
- 80        held &= result.wins() == SEATS && result.losses() == CUSTOMERS - SEATS;
- 81      }
- 82      return held;
- 83    }
- 84  
- 85    private boolean sweepVersusConfirm() {
- 86      out.println(
- 87          "-- a confirm and the expiry sweep meet on one seat, " + SWEEP_REPETITIONS + " times --");
- 88      var race = new SweepConfirmRace(store);
- 89      int sold = 0;
- 90      int freed = 0;
- 91      int inconsistent = 0;
- 92      for (int rep = 1; rep <= SWEEP_REPETITIONS; rep++) {
- 93        var result = race.run(new SeatId("sweep-" + runId + "-" + rep));
- 94        if (!result.isConsistent()) {
- 95          inconsistent++;
- 96        } else if (result.finalState() instanceof SeatState.Sold) {
- 97          sold++;
- 98        } else {
- 99          freed++;
-100        }
-101        if (rep <= 3 || rep == SWEEP_REPETITIONS) {
-102          out.println(String.format("rep %-3d  seat ended as %s", rep, result.finalState()));
-103        } else if (rep == 4) {
-104          out.println("...");
-105        }
-106      }
-107      out.println(
-108          "sold="
-109              + sold
-110              + " free="
-111              + freed
-112              + " inconsistent="
-113              + inconsistent
-114              + "  (every repetition: exactly one of Sold or Free, never both, never a third state)");
-115      return inconsistent == 0;
-116    }
-117  
-118    private void plainWriteSellsTwice() {
-119      out.println("-- the failure: a plain write instead of compare-and-set --");
-120      var plain = new PlainWriteSeatStore();
-121      SeatId seat = new SeatId("s-9");
-122      plain.add(seat);
-123      SeatState adaRead = plain.get(seat);
-124      SeatState brunoRead = plain.get(seat);
-125      Instant expiry = Instant.now().plus(TEN_MINUTES);
-126      boolean ada = plain.update(seat, adaRead, new Held(new CustomerId("ada"), expiry));
-127      boolean bruno = plain.update(seat, brunoRead, new Held(new CustomerId("bruno"), expiry));
-128      out.println(
-129          "first update: "
-130              + ada
-131              + "  second update (stale expected): "
-132              + bruno
-133              + "  <- both were told they won seat s-9; it now belongs to "
-134              + plain.get(seat));
-135    }
-136  
-137    private List<SeatId> freshSeats(String label) {
-138      List<SeatId> seats =
-139          IntStream.rangeClosed(1, SEATS)
-140              .mapToObj(n -> new SeatId(label + "-" + runId + "-" + n))
-141              .toList();
-142      seats.forEach(store::add);
-143      return seats;
-144    }
-145  }
+package io.plainround.seatholds.interfaces.cli;
+
+import io.plainround.seatholds.application.SeatHoldService;
+import io.plainround.seatholds.application.simulation.HoldRace;
+import io.plainround.seatholds.application.simulation.RaceResult;
+import io.plainround.seatholds.application.simulation.SweepConfirmRace;
+import io.plainround.seatholds.domain.Clock;
+import io.plainround.seatholds.domain.CustomerId;
+import io.plainround.seatholds.domain.Outcome;
+import io.plainround.seatholds.domain.SeatId;
+import io.plainround.seatholds.domain.SeatState;
+import io.plainround.seatholds.domain.SeatState.Free;
+import io.plainround.seatholds.domain.SeatState.Held;
+import io.plainround.seatholds.domain.SeatStore;
+```
+
+**Lines 15 to 21**
+
+```java
+import io.plainround.seatholds.domain.SeatTransitions;
+import io.plainround.seatholds.infrastructure.memory.PlainWriteSeatStore;
+import java.io.PrintStream;
+import java.time.Duration;
+import java.time.Instant;
+import java.util.List;
+import java.util.stream.IntStream;
+```
+
+**Lines 23 to 30**
+
+```java
+/** The lesson's scenarios on whichever store is configured, then the failure they guard against. */
+final class Scenario {
+
+  private static final int RACE_RUNS = 5;
+  private static final int CUSTOMERS = 1_000;
+  private static final int SEATS = 10;
+  private static final int SWEEP_REPETITIONS = 100;
+  private static final Duration TEN_MINUTES = Duration.ofMinutes(10);
+```
+
+**Lines 32 to 42**
+
+```java
+  private final SeatStore store;
+  private final SeatHoldService service;
+  private final String runId;
+  private final PrintStream out;
+
+  Scenario(SeatStore store, SeatHoldService service, String runId, PrintStream out) {
+    this.store = store;
+    this.service = service;
+    this.runId = runId;
+    this.out = out;
+  }
+```
+
+**Lines 44 to 56**
+
+```java
+  /**
+   * Runs every scenario.
+   *
+   * @return true if every invariant held
+   */
+  boolean run() {
+    confirmingAnExpiredHoldGivesAReason();
+    staleUpdateIsRejected();
+    boolean racesHeld = racesHaveExactlyTenWinners();
+    boolean sweepHeld = sweepVersusConfirm();
+    plainWriteSellsTwice();
+    return racesHeld && sweepHeld;
+  }
+```
+
+**Lines 58 to 63**
+
+```java
+  private void confirmingAnExpiredHoldGivesAReason() {
+    Clock fixed = () -> Instant.parse("2026-01-01T00:00:00Z");
+    var expiredHold = new Held(new CustomerId("ada"), fixed.now().minus(Duration.ofMinutes(1)));
+    Outcome result = SeatTransitions.confirm(expiredHold, new CustomerId("ada"), fixed);
+    out.println("confirm expired hold -> " + result + "  (never Success)");
+  }
+```
+
+**Lines 65 to 72**
+
+```java
+  private void staleUpdateIsRejected() {
+    SeatId seat = new SeatId("demo-" + runId);
+    store.add(seat);
+    Instant expiry = Instant.now().plus(TEN_MINUTES);
+    boolean first = store.update(seat, new Free(), new Held(new CustomerId("ada"), expiry));
+    boolean second = store.update(seat, new Free(), new Held(new CustomerId("bruno"), expiry));
+    out.println("first update: " + first + "  second update (stale expected): " + second);
+  }
+```
+
+**Lines 74 to 83**
+
+```java
+  private boolean racesHaveExactlyTenWinners() {
+    boolean held = true;
+    for (int run = 1; run <= RACE_RUNS; run++) {
+      List<SeatId> seats = freshSeats("race-" + run);
+      RaceResult result = new HoldRace(service).run(seats, CUSTOMERS);
+      out.println("race result: " + result);
+      held &= result.wins() == SEATS && result.losses() == CUSTOMERS - SEATS;
+    }
+    return held;
+  }
+```
+
+**Lines 85 to 97**
+
+```java
+  private boolean sweepVersusConfirm() {
+    out.println(
+        "-- a confirm and the expiry sweep meet on one seat, " + SWEEP_REPETITIONS + " times --");
+    var race = new SweepConfirmRace(store);
+    int sold = 0;
+    int freed = 0;
+    int inconsistent = 0;
+    for (int rep = 1; rep <= SWEEP_REPETITIONS; rep++) {
+      var result = race.run(new SeatId("sweep-" + runId + "-" + rep));
+      if (!result.isConsistent()) {
+        inconsistent++;
+      } else if (result.finalState() instanceof SeatState.Sold) {
+        sold++;
+```
+
+**Lines 98 to 111**
+
+```java
+      } else {
+        freed++;
+      }
+      if (rep <= 3 || rep == SWEEP_REPETITIONS) {
+        out.println(String.format("rep %-3d  seat ended as %s", rep, result.finalState()));
+      } else if (rep == 4) {
+        out.println("...");
+      }
+    }
+    out.println(
+        "sold="
+            + sold
+            + " free="
+            + freed
+```
+
+**Lines 112 to 125**
+
+```java
+            + " inconsistent="
+            + inconsistent
+            + "  (every repetition: exactly one of Sold or Free, never both, never a third state)");
+    return inconsistent == 0;
+  }
+
+  private void plainWriteSellsTwice() {
+    out.println("-- the failure: a plain write instead of compare-and-set --");
+    var plain = new PlainWriteSeatStore();
+    SeatId seat = new SeatId("s-9");
+    plain.add(seat);
+    SeatState adaRead = plain.get(seat);
+    SeatState brunoRead = plain.get(seat);
+    Instant expiry = Instant.now().plus(TEN_MINUTES);
+```
+
+**Lines 126 to 135**
+
+```java
+    boolean ada = plain.update(seat, adaRead, new Held(new CustomerId("ada"), expiry));
+    boolean bruno = plain.update(seat, brunoRead, new Held(new CustomerId("bruno"), expiry));
+    out.println(
+        "first update: "
+            + ada
+            + "  second update (stale expected): "
+            + bruno
+            + "  <- both were told they won seat s-9; it now belongs to "
+            + plain.get(seat));
+  }
+```
+
+**Lines 137 to 145**
+
+```java
+  private List<SeatId> freshSeats(String label) {
+    List<SeatId> seats =
+        IntStream.rangeClosed(1, SEATS)
+            .mapToObj(n -> new SeatId(label + "-" + runId + "-" + n))
+            .toList();
+    seats.forEach(store::add);
+    return seats;
+  }
+}
 ```
 
 | Lines | What they do |

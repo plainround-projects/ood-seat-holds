@@ -41,6 +41,45 @@ Each file below starts with a plain description of what it tests and how its set
 
 The in-memory version of the lesson's race. `tenFreeSeats(label)` adds ten free seats to the store; `race(seats, customers)` runs `HoldRace` over a service with a fixed clock. Tests: 1,000 customers for 10 seats give exactly 10 winners and 990 losers in each of 20 runs; every seat ends held by a different customer; with fewer customers than seats everyone wins; the result prints as `wins=10 losses=990`. The same race runs against PostgreSQL in `JdbcHoldRaceIT`.
 
+The top of the file:
+
+```java
+package io.plainround.seatholds.application;
+
+import static org.assertj.core.api.Assertions.assertThat;
+
+import io.plainround.seatholds.application.simulation.HoldRace;
+import io.plainround.seatholds.application.simulation.RaceResult;
+import io.plainround.seatholds.domain.SeatId;
+import io.plainround.seatholds.domain.SeatState.Held;
+import io.plainround.seatholds.infrastructure.memory.InMemorySeatStore;
+import io.plainround.seatholds.support.MutableClock;
+import java.time.Duration;
+import java.util.List;
+import java.util.stream.IntStream;
+import org.junit.jupiter.api.Test;
+
+/** The race over the in-memory adapter; the JDBC adapter runs the same one in JdbcHoldRaceIT. */
+class HoldRaceTest {
+```
+
+| Line | Code | What it means |
+| --- | --- | --- |
+| 1 | `package io.plainround.seatholds.application;` | The **package** of this class: its folder path under `src/test/java`, written with dots. It matches the package of the code under test, so the test can use that code's non-public parts. |
+| 3 | `import static org.assertj.core.api.Assertions.assertThat;` | AssertJ's `assertThat(actual)`: starts a readable check such as `assertThat(x).isEqualTo(y)`. `static` lets the test write `assertThat(...)` without the class name in front. |
+| 5 | `import io.plainround.seatholds.application.simulation.HoldRace;` | `HoldRace`: a class of this repository, from the package `application.simulation`, that this test uses. |
+| 6 | `import io.plainround.seatholds.application.simulation.RaceResult;` | `RaceResult`: a class of this repository, from the package `application.simulation`, that this test uses. |
+| 7 | `import io.plainround.seatholds.domain.SeatId;` | `SeatId`: a class of this repository, from the package `domain`, that this test uses. |
+| 8 | `import io.plainround.seatholds.domain.SeatState.Held;` | `Held`: a class of this repository, from the package `domain.SeatState`, that this test uses. |
+| 9 | `import io.plainround.seatholds.infrastructure.memory.InMemorySeatStore;` | `InMemorySeatStore`: a class of this repository, from the package `infrastructure.memory`, that this test uses. |
+| 10 | `import io.plainround.seatholds.support.MutableClock;` | `MutableClock`: a class of this repository, from the package `support`, that this test uses. |
+| 11 | `import java.time.Duration;` | `Duration`: an amount of time (for example 30 seconds). |
+| 12 | `import java.util.List;` | `List`: an ordered collection (a numbered row of items). |
+| 13 | `import java.util.stream.IntStream;` | `IntStream`: a stream (pipeline) of whole numbers, such as 0, 1, 2, ... for repeating a step many times. |
+| 14 | `import org.junit.jupiter.api.Test;` | JUnit's `@Test` marker: a method carrying it is a test that JUnit runs. |
+| 17 | `class HoldRaceTest` | The **class** that holds the code below. It has no `public` modifier (package-private): JUnit runs such classes too, so none is needed. Every method marked `@Test` inside it is one test. |
+| 16-16 | the comment | A comment (Javadoc): text for human readers; the compiler ignores it. |
+
 Setup, shared data and helpers:
 
 ```java
@@ -108,6 +147,55 @@ void theResultPrintsTheWayTheLessonShowsIt() {
 
 Tests the use cases with a movable clock and the in-memory store. `@BeforeEach` creates a store with one free seat `s-9` and a service with ten-minute holds. Tests: hold, a second customer refused, confirm within the time, confirm after ten minutes gives a reason and sells nothing, a sweep frees only expired holds, a freed seat can be held again, a sweep leaves sold seats alone, releasing one seat obeys the same rules, a lost write is read again and decided again, and a seat that keeps changing ends in a clear refusal after five attempts. The nested classes `LosesTheFirstWrite`, `LosesEveryWrite` and `ForwardingStore` are test doubles: stores that wrap the real one and misbehave on purpose (an intruder's hold lands between the read and the write; every write loses).
 
+The top of the file:
+
+```java
+package io.plainround.seatholds.application;
+
+import static org.assertj.core.api.Assertions.assertThat;
+
+import io.plainround.seatholds.domain.CustomerId;
+import io.plainround.seatholds.domain.Outcome.Reason;
+import io.plainround.seatholds.domain.Outcome.Success;
+import io.plainround.seatholds.domain.SeatId;
+import io.plainround.seatholds.domain.SeatState;
+import io.plainround.seatholds.domain.SeatState.Free;
+import io.plainround.seatholds.domain.SeatState.Held;
+import io.plainround.seatholds.domain.SeatState.Sold;
+import io.plainround.seatholds.domain.SeatStore;
+import io.plainround.seatholds.infrastructure.memory.InMemorySeatStore;
+import io.plainround.seatholds.support.MutableClock;
+import java.time.Duration;
+import java.util.List;
+import java.util.concurrent.atomic.AtomicInteger;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+
+class SeatHoldServiceTest {
+```
+
+| Line | Code | What it means |
+| --- | --- | --- |
+| 1 | `package io.plainround.seatholds.application;` | The **package** of this class: its folder path under `src/test/java`, written with dots. It matches the package of the code under test, so the test can use that code's non-public parts. |
+| 3 | `import static org.assertj.core.api.Assertions.assertThat;` | AssertJ's `assertThat(actual)`: starts a readable check such as `assertThat(x).isEqualTo(y)`. `static` lets the test write `assertThat(...)` without the class name in front. |
+| 5 | `import io.plainround.seatholds.domain.CustomerId;` | `CustomerId`: a class of this repository, from the package `domain`, that this test uses. |
+| 6 | `import io.plainround.seatholds.domain.Outcome.Reason;` | `Reason`: a class of this repository, from the package `domain.Outcome`, that this test uses. |
+| 7 | `import io.plainround.seatholds.domain.Outcome.Success;` | `Success`: a class of this repository, from the package `domain.Outcome`, that this test uses. |
+| 8 | `import io.plainround.seatholds.domain.SeatId;` | `SeatId`: a class of this repository, from the package `domain`, that this test uses. |
+| 9 | `import io.plainround.seatholds.domain.SeatState;` | `SeatState`: a class of this repository, from the package `domain`, that this test uses. |
+| 10 | `import io.plainround.seatholds.domain.SeatState.Free;` | `Free`: a class of this repository, from the package `domain.SeatState`, that this test uses. |
+| 11 | `import io.plainround.seatholds.domain.SeatState.Held;` | `Held`: a class of this repository, from the package `domain.SeatState`, that this test uses. |
+| 12 | `import io.plainround.seatholds.domain.SeatState.Sold;` | `Sold`: a class of this repository, from the package `domain.SeatState`, that this test uses. |
+| 13 | `import io.plainround.seatholds.domain.SeatStore;` | `SeatStore`: a class of this repository, from the package `domain`, that this test uses. |
+| 14 | `import io.plainround.seatholds.infrastructure.memory.InMemorySeatStore;` | `InMemorySeatStore`: a class of this repository, from the package `infrastructure.memory`, that this test uses. |
+| 15 | `import io.plainround.seatholds.support.MutableClock;` | `MutableClock`: a class of this repository, from the package `support`, that this test uses. |
+| 16 | `import java.time.Duration;` | `Duration`: an amount of time (for example 30 seconds). |
+| 17 | `import java.util.List;` | `List`: an ordered collection (a numbered row of items). |
+| 18 | `import java.util.concurrent.atomic.AtomicInteger;` | `AtomicInteger`: a whole number that several threads can add to safely, without losing updates. |
+| 19 | `import org.junit.jupiter.api.BeforeEach;` | JUnit's `@BeforeEach` marker: the method runs before every single test, to rebuild fresh state. |
+| 20 | `import org.junit.jupiter.api.Test;` | JUnit's `@Test` marker: a method carrying it is a test that JUnit runs. |
+| 22 | `class SeatHoldServiceTest` | The **class** that holds the code below. It has no `public` modifier (package-private): JUnit runs such classes too, so none is needed. Every method marked `@Test` inside it is one test. |
+
 Setup, shared data and helpers:
 
 ```java
@@ -132,6 +220,7 @@ void oneFreeSeat() {
   service = new SeatHoldService(store, clock, TEN_MINUTES);
 }
 
+/** Another customer's hold lands between the service's read and its write, the first time. */
 private static final class LosesTheFirstWrite extends ForwardingStore {
   private final SeatState intruder;
   private boolean intruded;
@@ -337,6 +426,31 @@ void aSeatThatKeepsChangingUnderTheCallerEndsInAClearRefusalNotALoop() {
 
 One test: 100 repetitions of the confirm-versus-sweep race on the in-memory store; each must end consistent (sold and confirmed, or freed and swept).
 
+The top of the file:
+
+```java
+package io.plainround.seatholds.application;
+
+import static org.assertj.core.api.Assertions.assertThat;
+
+import io.plainround.seatholds.application.simulation.SweepConfirmRace;
+import io.plainround.seatholds.domain.SeatId;
+import io.plainround.seatholds.infrastructure.memory.InMemorySeatStore;
+import org.junit.jupiter.api.Test;
+
+class SweepConfirmRaceTest {
+```
+
+| Line | Code | What it means |
+| --- | --- | --- |
+| 1 | `package io.plainround.seatholds.application;` | The **package** of this class: its folder path under `src/test/java`, written with dots. It matches the package of the code under test, so the test can use that code's non-public parts. |
+| 3 | `import static org.assertj.core.api.Assertions.assertThat;` | AssertJ's `assertThat(actual)`: starts a readable check such as `assertThat(x).isEqualTo(y)`. `static` lets the test write `assertThat(...)` without the class name in front. |
+| 5 | `import io.plainround.seatholds.application.simulation.SweepConfirmRace;` | `SweepConfirmRace`: a class of this repository, from the package `application.simulation`, that this test uses. |
+| 6 | `import io.plainround.seatholds.domain.SeatId;` | `SeatId`: a class of this repository, from the package `domain`, that this test uses. |
+| 7 | `import io.plainround.seatholds.infrastructure.memory.InMemorySeatStore;` | `InMemorySeatStore`: a class of this repository, from the package `infrastructure.memory`, that this test uses. |
+| 8 | `import org.junit.jupiter.api.Test;` | JUnit's `@Test` marker: a method carrying it is a test that JUnit runs. |
+| 10 | `class SweepConfirmRaceTest` | The **class** that holds the code below. It has no `public` modifier (package-private): JUnit runs such classes too, so none is needed. Every method marked `@Test` inside it is one test. |
+
 **Across one hundred repetitions a seat is never both sold and released.**
 
 ```java
@@ -360,6 +474,61 @@ void acrossOneHundredRepetitionsASeatIsNeverBothSoldAndReleased() {
 
 Tests the race drivers themselves: how a repetition is judged consistent (two legal combinations and five illegal ones), that the rendezvous store forwards every call and gives up if the other party never reads, that a failure inside a customer's attempt is reported, that an interrupted race keeps the interrupt flag and says so, that a failing store makes the sweep race report "did not finish", and that a store failure keeps its cause. `FailingUpdates` is a store that refuses every write except the first hold.
 
+The top of the file:
+
+```java
+package io.plainround.seatholds.application.simulation;
+
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
+
+import io.plainround.seatholds.application.SeatHoldService;
+import io.plainround.seatholds.application.simulation.SweepConfirmRace.Repetition;
+import io.plainround.seatholds.domain.CustomerId;
+import io.plainround.seatholds.domain.SeatId;
+import io.plainround.seatholds.domain.SeatState;
+import io.plainround.seatholds.domain.SeatState.Free;
+import io.plainround.seatholds.domain.SeatState.Held;
+import io.plainround.seatholds.domain.SeatState.Sold;
+import io.plainround.seatholds.domain.SeatStore;
+import io.plainround.seatholds.domain.SeatStoreException;
+import io.plainround.seatholds.domain.UnknownSeatException;
+import io.plainround.seatholds.infrastructure.memory.InMemorySeatStore;
+import io.plainround.seatholds.support.MutableClock;
+import java.time.Duration;
+import java.time.Instant;
+import java.util.List;
+import org.junit.jupiter.api.Test;
+
+/** The harness's own behavior: how it judges a repetition and how it fails. */
+class SimulationEdgeCasesTest {
+```
+
+| Line | Code | What it means |
+| --- | --- | --- |
+| 1 | `package io.plainround.seatholds.application.simulation;` | The **package** of this class: its folder path under `src/test/java`, written with dots. It matches the package of the code under test, so the test can use that code's non-public parts. |
+| 3 | `import static org.assertj.core.api.Assertions.assertThat;` | AssertJ's `assertThat(actual)`: starts a readable check such as `assertThat(x).isEqualTo(y)`. `static` lets the test write `assertThat(...)` without the class name in front. |
+| 4 | `import static org.assertj.core.api.Assertions.assertThatThrownBy;` | AssertJ's `assertThatThrownBy(() -> code)`: runs the code and checks that it throws, then lets the test inspect the exception. |
+| 6 | `import io.plainround.seatholds.application.SeatHoldService;` | `SeatHoldService`: a class of this repository, from the package `application`, that this test uses. |
+| 7 | `import io.plainround.seatholds.application.simulation.SweepConfirmRace.Repetition;` | `Repetition`: a class of this repository, from the package `application.simulation.SweepConfirmRace`, that this test uses. |
+| 8 | `import io.plainround.seatholds.domain.CustomerId;` | `CustomerId`: a class of this repository, from the package `domain`, that this test uses. |
+| 9 | `import io.plainround.seatholds.domain.SeatId;` | `SeatId`: a class of this repository, from the package `domain`, that this test uses. |
+| 10 | `import io.plainround.seatholds.domain.SeatState;` | `SeatState`: a class of this repository, from the package `domain`, that this test uses. |
+| 11 | `import io.plainround.seatholds.domain.SeatState.Free;` | `Free`: a class of this repository, from the package `domain.SeatState`, that this test uses. |
+| 12 | `import io.plainround.seatholds.domain.SeatState.Held;` | `Held`: a class of this repository, from the package `domain.SeatState`, that this test uses. |
+| 13 | `import io.plainround.seatholds.domain.SeatState.Sold;` | `Sold`: a class of this repository, from the package `domain.SeatState`, that this test uses. |
+| 14 | `import io.plainround.seatholds.domain.SeatStore;` | `SeatStore`: a class of this repository, from the package `domain`, that this test uses. |
+| 15 | `import io.plainround.seatholds.domain.SeatStoreException;` | `SeatStoreException`: a class of this repository, from the package `domain`, that this test uses. |
+| 16 | `import io.plainround.seatholds.domain.UnknownSeatException;` | `UnknownSeatException`: a class of this repository, from the package `domain`, that this test uses. |
+| 17 | `import io.plainround.seatholds.infrastructure.memory.InMemorySeatStore;` | `InMemorySeatStore`: a class of this repository, from the package `infrastructure.memory`, that this test uses. |
+| 18 | `import io.plainround.seatholds.support.MutableClock;` | `MutableClock`: a class of this repository, from the package `support`, that this test uses. |
+| 19 | `import java.time.Duration;` | `Duration`: an amount of time (for example 30 seconds). |
+| 20 | `import java.time.Instant;` | `Instant`: one exact point on the timeline. |
+| 21 | `import java.util.List;` | `List`: an ordered collection (a numbered row of items). |
+| 22 | `import org.junit.jupiter.api.Test;` | JUnit's `@Test` marker: a method carrying it is a test that JUnit runs. |
+| 25 | `class SimulationEdgeCasesTest` | The **class** that holds the code below. It has no `public` modifier (package-private): JUnit runs such classes too, so none is needed. Every method marked `@Test` inside it is one test. |
+| 24-24 | the comment | A comment (Javadoc): text for human readers; the compiler ignores it. |
+
 Setup, shared data and helpers:
 
 ```java
@@ -367,6 +536,7 @@ private static final Instant SOME_TIME = Instant.parse("2026-01-01T00:10:00Z");
 
 private static final CustomerId ADA = new CustomerId("ada");
 
+/** A store whose writes fail, as a database that has gone away would. */
 private static final class FailingUpdates implements SeatStore {
   private final SeatStore delegate;
 
@@ -545,6 +715,41 @@ Quoted in full in `archunit.md`.
 #### `domain/SeatTransitionsTest.java` (14 tests)
 
 Tests the pure transition functions with a movable clock (`MutableClock`). `heldByAdaUntilTenMinutesFromNow()` builds a hold. Tests cover hold on a free, held and sold seat; confirm by the holder before the expiry, after it (a reason, never a sale), exactly at the expiry (still succeeds) and one millisecond later (fails), by someone else, on a free seat and on a sold seat; release of an expired hold, never of an unexpired one even at the exact expiry, never of a free or sold seat; and a loop over five instants around the boundary that proves exactly one of confirm and release is allowed at any instant.
+
+The top of the file:
+
+```java
+package io.plainround.seatholds.domain;
+
+import static org.assertj.core.api.Assertions.assertThat;
+
+import io.plainround.seatholds.domain.Outcome.Reason;
+import io.plainround.seatholds.domain.Outcome.Success;
+import io.plainround.seatholds.domain.SeatState.Free;
+import io.plainround.seatholds.domain.SeatState.Held;
+import io.plainround.seatholds.domain.SeatState.Sold;
+import io.plainround.seatholds.support.MutableClock;
+import java.time.Duration;
+import java.time.Instant;
+import org.junit.jupiter.api.Test;
+
+class SeatTransitionsTest {
+```
+
+| Line | Code | What it means |
+| --- | --- | --- |
+| 1 | `package io.plainround.seatholds.domain;` | The **package** of this class: its folder path under `src/test/java`, written with dots. It matches the package of the code under test, so the test can use that code's non-public parts. |
+| 3 | `import static org.assertj.core.api.Assertions.assertThat;` | AssertJ's `assertThat(actual)`: starts a readable check such as `assertThat(x).isEqualTo(y)`. `static` lets the test write `assertThat(...)` without the class name in front. |
+| 5 | `import io.plainround.seatholds.domain.Outcome.Reason;` | `Reason`: a class of this repository, from the package `domain.Outcome`, that this test uses. |
+| 6 | `import io.plainround.seatholds.domain.Outcome.Success;` | `Success`: a class of this repository, from the package `domain.Outcome`, that this test uses. |
+| 7 | `import io.plainround.seatholds.domain.SeatState.Free;` | `Free`: a class of this repository, from the package `domain.SeatState`, that this test uses. |
+| 8 | `import io.plainround.seatholds.domain.SeatState.Held;` | `Held`: a class of this repository, from the package `domain.SeatState`, that this test uses. |
+| 9 | `import io.plainround.seatholds.domain.SeatState.Sold;` | `Sold`: a class of this repository, from the package `domain.SeatState`, that this test uses. |
+| 10 | `import io.plainround.seatholds.support.MutableClock;` | `MutableClock`: a class of this repository, from the package `support`, that this test uses. |
+| 11 | `import java.time.Duration;` | `Duration`: an amount of time (for example 30 seconds). |
+| 12 | `import java.time.Instant;` | `Instant`: one exact point on the timeline. |
+| 13 | `import org.junit.jupiter.api.Test;` | JUnit's `@Test` marker: a method carrying it is a test that JUnit runs. |
+| 15 | `class SeatTransitionsTest` | The **class** that holds the code below. It has no `public` modifier (package-private): JUnit runs such classes too, so none is needed. Every method marked `@Test` inside it is one test. |
 
 Setup, shared data and helpers:
 
@@ -730,6 +935,33 @@ void confirmAndReleaseNeverBothSucceedForOneStateAtOneInstant() {
 
 Tests the small types: ids are never blank and are trimmed; a hold needs a customer and an expiry; a sale needs a customer; an expiry is kept to the millisecond; `SeatState` and `Outcome` are sealed with exactly the expected permitted subclasses (checked with reflection: `getPermittedSubclasses()`).
 
+The top of the file:
+
+```java
+package io.plainround.seatholds.domain;
+
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
+
+import io.plainround.seatholds.domain.SeatState.Held;
+import io.plainround.seatholds.domain.SeatState.Sold;
+import java.time.Instant;
+import org.junit.jupiter.api.Test;
+
+class ValueObjectsTest {
+```
+
+| Line | Code | What it means |
+| --- | --- | --- |
+| 1 | `package io.plainround.seatholds.domain;` | The **package** of this class: its folder path under `src/test/java`, written with dots. It matches the package of the code under test, so the test can use that code's non-public parts. |
+| 3 | `import static org.assertj.core.api.Assertions.assertThat;` | AssertJ's `assertThat(actual)`: starts a readable check such as `assertThat(x).isEqualTo(y)`. `static` lets the test write `assertThat(...)` without the class name in front. |
+| 4 | `import static org.assertj.core.api.Assertions.assertThatThrownBy;` | AssertJ's `assertThatThrownBy(() -> code)`: runs the code and checks that it throws, then lets the test inspect the exception. |
+| 6 | `import io.plainround.seatholds.domain.SeatState.Held;` | `Held`: a class of this repository, from the package `domain.SeatState`, that this test uses. |
+| 7 | `import io.plainround.seatholds.domain.SeatState.Sold;` | `Sold`: a class of this repository, from the package `domain.SeatState`, that this test uses. |
+| 8 | `import java.time.Instant;` | `Instant`: one exact point on the timeline. |
+| 9 | `import org.junit.jupiter.api.Test;` | JUnit's `@Test` marker: a method carrying it is a test that JUnit runs. |
+| 11 | `class ValueObjectsTest` | The **class** that holds the code below. It has no `public` modifier (package-private): JUnit runs such classes too, so none is needed. Every method marked `@Test` inside it is one test. |
+
 **Ids are never blank and are trimmed.**
 
 ```java
@@ -791,6 +1023,41 @@ void theSeatStateIsSealedWithExactlyThreeKinds() {
 #### `e2e/ScenarioEndToEndTest.java` (5 tests)
 
 Runs the `scenario` command once (`@BeforeAll`) on the in-memory store and checks the output: it starts with the expired-confirm line, the stale update is rejected, there are exactly five `wins=10 losses=990` lines, the sweep race reports `inconsistent=0`, and the plain-write store sells the seat twice. The command's exit code must be 0, meaning every invariant held.
+
+The top of the file:
+
+```java
+package io.plainround.seatholds.e2e;
+
+import static org.assertj.core.api.Assertions.assertThat;
+
+import io.plainround.seatholds.interfaces.cli.Cli;
+import java.io.ByteArrayOutputStream;
+import java.io.PrintStream;
+import java.nio.charset.StandardCharsets;
+import java.util.Map;
+import java.util.concurrent.CountDownLatch;
+import org.junit.jupiter.api.BeforeAll;
+import org.junit.jupiter.api.Test;
+
+/** The lesson's scenarios through the command a reader runs with {@code make run}. */
+class ScenarioEndToEndTest {
+```
+
+| Line | Code | What it means |
+| --- | --- | --- |
+| 1 | `package io.plainround.seatholds.e2e;` | The **package** of this class: its folder path under `src/test/java`, written with dots. It matches the package of the code under test, so the test can use that code's non-public parts. |
+| 3 | `import static org.assertj.core.api.Assertions.assertThat;` | AssertJ's `assertThat(actual)`: starts a readable check such as `assertThat(x).isEqualTo(y)`. `static` lets the test write `assertThat(...)` without the class name in front. |
+| 5 | `import io.plainround.seatholds.interfaces.cli.Cli;` | `Cli`: a class of this repository, from the package `interfaces.cli`, that this test uses. |
+| 6 | `import java.io.ByteArrayOutputStream;` | `ByteArrayOutputStream`: an output channel that collects what is written into memory, so a test can read it back. |
+| 7 | `import java.io.PrintStream;` | `PrintStream`: an output channel that can print text (what `System.out` is). |
+| 8 | `import java.nio.charset.StandardCharsets;` | `StandardCharsets`: names of text encodings such as UTF-8 (how characters become bytes). |
+| 9 | `import java.util.Map;` | `Map`: a collection of key-to-value pairs (like a dictionary). |
+| 10 | `import java.util.concurrent.CountDownLatch;` | `CountDownLatch`: a counter that threads wait on; it releases all waiting threads at once when it reaches zero. Used to start many threads at the same instant. |
+| 11 | `import org.junit.jupiter.api.BeforeAll;` | JUnit's `@BeforeAll` marker: the (static) method runs once before all the tests of the class. |
+| 12 | `import org.junit.jupiter.api.Test;` | JUnit's `@Test` marker: a method carrying it is a test that JUnit runs. |
+| 15 | `class ScenarioEndToEndTest` | The **class** that holds the code below. It has no `public` modifier (package-private): JUnit runs such classes too, so none is needed. Every method marked `@Test` inside it is one test. |
+| 14-14 | the comment | A comment (Javadoc): text for human readers; the compiler ignores it. |
 
 Setup, shared data and helpers:
 
@@ -866,6 +1133,24 @@ void aPlainWriteInsteadOfCompareAndSetSellsTheSeatTwice() {
 
 Twelve lines: it extends `SeatStoreContract` and supplies only `newStore()`, so all ten contract tests run against the in-memory store.
 
+The top of the file:
+
+```java
+package io.plainround.seatholds.infrastructure;
+
+import io.plainround.seatholds.domain.SeatStore;
+import io.plainround.seatholds.infrastructure.memory.InMemorySeatStore;
+
+class InMemorySeatStoreTest extends SeatStoreContract {
+```
+
+| Line | Code | What it means |
+| --- | --- | --- |
+| 1 | `package io.plainround.seatholds.infrastructure;` | The **package** of this class: its folder path under `src/test/java`, written with dots. It matches the package of the code under test, so the test can use that code's non-public parts. |
+| 3 | `import io.plainround.seatholds.domain.SeatStore;` | `SeatStore`: a class of this repository, from the package `domain`, that this test uses. |
+| 4 | `import io.plainround.seatholds.infrastructure.memory.InMemorySeatStore;` | `InMemorySeatStore`: a class of this repository, from the package `infrastructure.memory`, that this test uses. |
+| 6 | `class InMemorySeatStoreTest extends SeatStoreContract` | The **class** that holds the code below. It has no `public` modifier (package-private): JUnit runs such classes too, so none is needed. |
+
 Setup, shared data and helpers:
 
 ```java
@@ -878,6 +1163,51 @@ protected SeatStore newStore() {
 #### `infrastructure/PlainWriteSeatStoreTest.java` (3 tests)
 
 The counter-example store: a stale write succeeds, so two callers both think they won; the domain decides correctly both times and the seat is still lost because only the store could have stopped it; unknown seats are still errors.
+
+The top of the file:
+
+```java
+package io.plainround.seatholds.infrastructure;
+
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
+
+import io.plainround.seatholds.domain.CustomerId;
+import io.plainround.seatholds.domain.Outcome.Success;
+import io.plainround.seatholds.domain.SeatId;
+import io.plainround.seatholds.domain.SeatState.Free;
+import io.plainround.seatholds.domain.SeatState.Held;
+import io.plainround.seatholds.domain.SeatTransitions;
+import io.plainround.seatholds.domain.UnknownSeatException;
+import io.plainround.seatholds.infrastructure.memory.PlainWriteSeatStore;
+import io.plainround.seatholds.support.MutableClock;
+import java.time.Duration;
+import java.time.Instant;
+import org.junit.jupiter.api.Test;
+
+/** The counter-example: what the store contract exists to catch. */
+class PlainWriteSeatStoreTest {
+```
+
+| Line | Code | What it means |
+| --- | --- | --- |
+| 1 | `package io.plainround.seatholds.infrastructure;` | The **package** of this class: its folder path under `src/test/java`, written with dots. It matches the package of the code under test, so the test can use that code's non-public parts. |
+| 3 | `import static org.assertj.core.api.Assertions.assertThat;` | AssertJ's `assertThat(actual)`: starts a readable check such as `assertThat(x).isEqualTo(y)`. `static` lets the test write `assertThat(...)` without the class name in front. |
+| 4 | `import static org.assertj.core.api.Assertions.assertThatThrownBy;` | AssertJ's `assertThatThrownBy(() -> code)`: runs the code and checks that it throws, then lets the test inspect the exception. |
+| 6 | `import io.plainround.seatholds.domain.CustomerId;` | `CustomerId`: a class of this repository, from the package `domain`, that this test uses. |
+| 7 | `import io.plainround.seatholds.domain.Outcome.Success;` | `Success`: a class of this repository, from the package `domain.Outcome`, that this test uses. |
+| 8 | `import io.plainround.seatholds.domain.SeatId;` | `SeatId`: a class of this repository, from the package `domain`, that this test uses. |
+| 9 | `import io.plainround.seatholds.domain.SeatState.Free;` | `Free`: a class of this repository, from the package `domain.SeatState`, that this test uses. |
+| 10 | `import io.plainround.seatholds.domain.SeatState.Held;` | `Held`: a class of this repository, from the package `domain.SeatState`, that this test uses. |
+| 11 | `import io.plainround.seatholds.domain.SeatTransitions;` | `SeatTransitions`: a class of this repository, from the package `domain`, that this test uses. |
+| 12 | `import io.plainround.seatholds.domain.UnknownSeatException;` | `UnknownSeatException`: a class of this repository, from the package `domain`, that this test uses. |
+| 13 | `import io.plainround.seatholds.infrastructure.memory.PlainWriteSeatStore;` | `PlainWriteSeatStore`: a class of this repository, from the package `infrastructure.memory`, that this test uses. |
+| 14 | `import io.plainround.seatholds.support.MutableClock;` | `MutableClock`: a class of this repository, from the package `support`, that this test uses. |
+| 15 | `import java.time.Duration;` | `Duration`: an amount of time (for example 30 seconds). |
+| 16 | `import java.time.Instant;` | `Instant`: one exact point on the timeline. |
+| 17 | `import org.junit.jupiter.api.Test;` | JUnit's `@Test` marker: a method carrying it is a test that JUnit runs. |
+| 20 | `class PlainWriteSeatStoreTest` | The **class** that holds the code below. It has no `public` modifier (package-private): JUnit runs such classes too, so none is needed. Every method marked `@Test` inside it is one test. |
+| 19-19 | the comment | A comment (Javadoc): text for human readers; the compiler ignores it. |
 
 Setup, shared data and helpers:
 
@@ -948,6 +1278,41 @@ void anUnknownSeatIsStillAnError() {
 
 Tests the sweeper with a fake `ExpireHolds` that counts sweeps: it sweeps repeatedly (three sweeps within ten seconds), stops sweeping when closed, and keeps sweeping after a sweep throws. `CountDownLatch.await(10, SECONDS)` waits at most ten seconds for the third sweep.
 
+The top of the file:
+
+```java
+package io.plainround.seatholds.infrastructure;
+
+import static org.assertj.core.api.Assertions.assertThat;
+
+import io.plainround.seatholds.application.ExpireHolds;
+import io.plainround.seatholds.domain.Outcome;
+import io.plainround.seatholds.domain.SeatId;
+import io.plainround.seatholds.infrastructure.scheduling.ScheduledSweeper;
+import java.time.Duration;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicInteger;
+import org.junit.jupiter.api.Test;
+
+class ScheduledSweeperTest {
+```
+
+| Line | Code | What it means |
+| --- | --- | --- |
+| 1 | `package io.plainround.seatholds.infrastructure;` | The **package** of this class: its folder path under `src/test/java`, written with dots. It matches the package of the code under test, so the test can use that code's non-public parts. |
+| 3 | `import static org.assertj.core.api.Assertions.assertThat;` | AssertJ's `assertThat(actual)`: starts a readable check such as `assertThat(x).isEqualTo(y)`. `static` lets the test write `assertThat(...)` without the class name in front. |
+| 5 | `import io.plainround.seatholds.application.ExpireHolds;` | `ExpireHolds`: a class of this repository, from the package `application`, that this test uses. |
+| 6 | `import io.plainround.seatholds.domain.Outcome;` | `Outcome`: a class of this repository, from the package `domain`, that this test uses. |
+| 7 | `import io.plainround.seatholds.domain.SeatId;` | `SeatId`: a class of this repository, from the package `domain`, that this test uses. |
+| 8 | `import io.plainround.seatholds.infrastructure.scheduling.ScheduledSweeper;` | `ScheduledSweeper`: a class of this repository, from the package `infrastructure.scheduling`, that this test uses. |
+| 9 | `import java.time.Duration;` | `Duration`: an amount of time (for example 30 seconds). |
+| 10 | `import java.util.concurrent.CountDownLatch;` | `CountDownLatch`: a counter that threads wait on; it releases all waiting threads at once when it reaches zero. Used to start many threads at the same instant. |
+| 11 | `import java.util.concurrent.TimeUnit;` | `TimeUnit`: a unit (seconds, milliseconds) for waiting and timeouts. |
+| 12 | `import java.util.concurrent.atomic.AtomicInteger;` | `AtomicInteger`: a whole number that several threads can add to safely, without losing updates. |
+| 13 | `import org.junit.jupiter.api.Test;` | JUnit's `@Test` marker: a method carrying it is a test that JUnit runs. |
+| 15 | `class ScheduledSweeperTest` | The **class** that holds the code below. It has no `public` modifier (package-private): JUnit runs such classes too, so none is needed. Every method marked `@Test` inside it is one test. |
+
 Setup, shared data and helpers:
 
 ```java
@@ -1013,6 +1378,69 @@ void aSweepThatThrowsDoesNotStopTheNextOne() throws InterruptedException {
 
 The abstract contract every `SeatStore` must pass (`junit.md`). `newStore()` is the one thing a subclass supplies. `@BeforeEach` creates a store with one free seat. The tests: a new seat is free; get and update round-trip every kind of state; a held seat goes back to free; a stale expected state is rejected and changes nothing; an expected state of the right kind but wrong value is rejected; two concurrent updates of one seat give exactly one winner (25 rounds on virtual threads); an unknown seat is an error; adding a seat twice keeps its state; the seats are listed in id order; and a state read back equals the one written, even with nanoseconds.
 
+The top of the file:
+
+```java
+package io.plainround.seatholds.infrastructure;
+
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
+
+import io.plainround.seatholds.domain.CustomerId;
+import io.plainround.seatholds.domain.SeatId;
+import io.plainround.seatholds.domain.SeatState;
+import io.plainround.seatholds.domain.SeatState.Free;
+import io.plainround.seatholds.domain.SeatState.Held;
+import io.plainround.seatholds.domain.SeatState.Sold;
+import io.plainround.seatholds.domain.SeatStore;
+import io.plainround.seatholds.domain.UnknownSeatException;
+import java.time.Instant;
+import java.util.ArrayList;
+import java.util.Comparator;
+import java.util.List;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
+import java.util.concurrent.atomic.AtomicInteger;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+
+/**
+ * What any {@link SeatStore} must do, independent of how it is built. Each adapter's test class
+ * extends this one and supplies a store; none of these tests changes between adapters, so passing
+ * them is what makes an adapter trustworthy.
+ */
+public abstract class SeatStoreContract {
+```
+
+| Line | Code | What it means |
+| --- | --- | --- |
+| 1 | `package io.plainround.seatholds.infrastructure;` | The **package** of this class: its folder path under `src/test/java`, written with dots. It matches the package of the code under test, so the test can use that code's non-public parts. |
+| 3 | `import static org.assertj.core.api.Assertions.assertThat;` | AssertJ's `assertThat(actual)`: starts a readable check such as `assertThat(x).isEqualTo(y)`. `static` lets the test write `assertThat(...)` without the class name in front. |
+| 4 | `import static org.assertj.core.api.Assertions.assertThatThrownBy;` | AssertJ's `assertThatThrownBy(() -> code)`: runs the code and checks that it throws, then lets the test inspect the exception. |
+| 6 | `import io.plainround.seatholds.domain.CustomerId;` | `CustomerId`: a class of this repository, from the package `domain`, that this test uses. |
+| 7 | `import io.plainround.seatholds.domain.SeatId;` | `SeatId`: a class of this repository, from the package `domain`, that this test uses. |
+| 8 | `import io.plainround.seatholds.domain.SeatState;` | `SeatState`: a class of this repository, from the package `domain`, that this test uses. |
+| 9 | `import io.plainround.seatholds.domain.SeatState.Free;` | `Free`: a class of this repository, from the package `domain.SeatState`, that this test uses. |
+| 10 | `import io.plainround.seatholds.domain.SeatState.Held;` | `Held`: a class of this repository, from the package `domain.SeatState`, that this test uses. |
+| 11 | `import io.plainround.seatholds.domain.SeatState.Sold;` | `Sold`: a class of this repository, from the package `domain.SeatState`, that this test uses. |
+| 12 | `import io.plainround.seatholds.domain.SeatStore;` | `SeatStore`: a class of this repository, from the package `domain`, that this test uses. |
+| 13 | `import io.plainround.seatholds.domain.UnknownSeatException;` | `UnknownSeatException`: a class of this repository, from the package `domain`, that this test uses. |
+| 14 | `import java.time.Instant;` | `Instant`: one exact point on the timeline. |
+| 15 | `import java.util.ArrayList;` | `ArrayList`: a list that grows as items are added. |
+| 16 | `import java.util.Comparator;` | `Comparator`: a rule for putting items in order. |
+| 17 | `import java.util.List;` | `List`: an ordered collection (a numbered row of items). |
+| 18 | `import java.util.concurrent.CountDownLatch;` | `CountDownLatch`: a counter that threads wait on; it releases all waiting threads at once when it reaches zero. Used to start many threads at the same instant. |
+| 19 | `import java.util.concurrent.ExecutorService;` | `ExecutorService`: a pool of threads that runs tasks you hand it. |
+| 20 | `import java.util.concurrent.Executors;` | `Executors`: a factory that creates thread pools. |
+| 21 | `import java.util.concurrent.Future;` | `Future`: a ticket for a result that a thread is still computing; `get()` waits for it. |
+| 22 | `import java.util.concurrent.atomic.AtomicInteger;` | `AtomicInteger`: a whole number that several threads can add to safely, without losing updates. |
+| 23 | `import org.junit.jupiter.api.BeforeEach;` | JUnit's `@BeforeEach` marker: the method runs before every single test, to rebuild fresh state. |
+| 24 | `import org.junit.jupiter.api.Test;` | JUnit's `@Test` marker: a method carrying it is a test that JUnit runs. |
+| 31 | `public abstract class SeatStoreContract` | The **class** that holds the code below. It is `public`, so any class can see it. It is `abstract`: it cannot be created by itself; other classes extend it and fill in the missing pieces. Every method marked `@Test` inside it is one test. |
+| 26-30 | the comment | A comment (Javadoc): text for human readers; the compiler ignores it. |
+
 Setup, shared data and helpers:
 
 ```java
@@ -1026,6 +1454,7 @@ private SeatStore store;
 
 private SeatId seat;
 
+/** A new, empty store of the adapter under test. */
 protected abstract SeatStore newStore();
 
 @BeforeEach
@@ -1195,6 +1624,47 @@ void aStateReadBackIsEqualToTheOneWritten() {
 
 The lesson's two races against PostgreSQL: 20 races of 1,000 customers for 10 seats (each exactly 10 and 990) and 100 confirm-versus-sweep repetitions. A name ending in `IT` means Failsafe runs it, only with `-Pintegration` (`maven-failsafe.md`).
 
+The top of the file:
+
+```java
+package io.plainround.seatholds.infrastructure.jdbc;
+
+import static org.assertj.core.api.Assertions.assertThat;
+
+import io.plainround.seatholds.application.SeatHoldService;
+import io.plainround.seatholds.application.simulation.HoldRace;
+import io.plainround.seatholds.application.simulation.RaceResult;
+import io.plainround.seatholds.application.simulation.SweepConfirmRace;
+import io.plainround.seatholds.domain.SeatId;
+import io.plainround.seatholds.infrastructure.time.SystemClock;
+import io.plainround.seatholds.support.PostgresFixture;
+import java.time.Duration;
+import java.util.List;
+import java.util.stream.IntStream;
+import org.junit.jupiter.api.Test;
+
+/** The lesson's two races against PostgreSQL: a thousand virtual threads, then confirm vs sweep. */
+class JdbcHoldRaceIT {
+```
+
+| Line | Code | What it means |
+| --- | --- | --- |
+| 1 | `package io.plainround.seatholds.infrastructure.jdbc;` | The **package** of this class: its folder path under `src/test/java`, written with dots. It matches the package of the code under test, so the test can use that code's non-public parts. |
+| 3 | `import static org.assertj.core.api.Assertions.assertThat;` | AssertJ's `assertThat(actual)`: starts a readable check such as `assertThat(x).isEqualTo(y)`. `static` lets the test write `assertThat(...)` without the class name in front. |
+| 5 | `import io.plainround.seatholds.application.SeatHoldService;` | `SeatHoldService`: a class of this repository, from the package `application`, that this test uses. |
+| 6 | `import io.plainround.seatholds.application.simulation.HoldRace;` | `HoldRace`: a class of this repository, from the package `application.simulation`, that this test uses. |
+| 7 | `import io.plainround.seatholds.application.simulation.RaceResult;` | `RaceResult`: a class of this repository, from the package `application.simulation`, that this test uses. |
+| 8 | `import io.plainround.seatholds.application.simulation.SweepConfirmRace;` | `SweepConfirmRace`: a class of this repository, from the package `application.simulation`, that this test uses. |
+| 9 | `import io.plainround.seatholds.domain.SeatId;` | `SeatId`: a class of this repository, from the package `domain`, that this test uses. |
+| 10 | `import io.plainround.seatholds.infrastructure.time.SystemClock;` | `SystemClock`: a class of this repository, from the package `infrastructure.time`, that this test uses. |
+| 11 | `import io.plainround.seatholds.support.PostgresFixture;` | `PostgresFixture`: a class of this repository, from the package `support`, that this test uses. |
+| 12 | `import java.time.Duration;` | `Duration`: an amount of time (for example 30 seconds). |
+| 13 | `import java.util.List;` | `List`: an ordered collection (a numbered row of items). |
+| 14 | `import java.util.stream.IntStream;` | `IntStream`: a stream (pipeline) of whole numbers, such as 0, 1, 2, ... for repeating a step many times. |
+| 15 | `import org.junit.jupiter.api.Test;` | JUnit's `@Test` marker: a method carrying it is a test that JUnit runs. |
+| 18 | `class JdbcHoldRaceIT` | The **class** that holds the code below. It has no `public` modifier (package-private): JUnit runs such classes too, so none is needed. Every method marked `@Test` inside it is one test. |
+| 17-17 | the comment | A comment (Javadoc): text for human readers; the compiler ignores it. |
+
 Setup, shared data and helpers:
 
 ```java
@@ -1246,6 +1716,39 @@ void acrossOneHundredRepetitionsASeatIsNeverBothSoldAndReleased() {
 #### `infrastructure/jdbc/JdbcSeatStoreIT.java` (2 tests)
 
 Extends `SeatStoreContract` with a PostgreSQL store, so the identical ten contract tests run against the real database, and adds two database-only tests: the table's CHECK constraint refuses an impossible seat, and every change increments `version`.
+
+The top of the file:
+
+```java
+package io.plainround.seatholds.infrastructure.jdbc;
+
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
+
+import io.plainround.seatholds.domain.SeatId;
+import io.plainround.seatholds.domain.SeatStore;
+import io.plainround.seatholds.infrastructure.SeatStoreContract;
+import io.plainround.seatholds.support.PostgresFixture;
+import java.sql.SQLException;
+import org.junit.jupiter.api.Test;
+
+/** The identical contract class the in-memory adapter passes, against PostgreSQL in a container. */
+class JdbcSeatStoreIT extends SeatStoreContract {
+```
+
+| Line | Code | What it means |
+| --- | --- | --- |
+| 1 | `package io.plainround.seatholds.infrastructure.jdbc;` | The **package** of this class: its folder path under `src/test/java`, written with dots. It matches the package of the code under test, so the test can use that code's non-public parts. |
+| 3 | `import static org.assertj.core.api.Assertions.assertThat;` | AssertJ's `assertThat(actual)`: starts a readable check such as `assertThat(x).isEqualTo(y)`. `static` lets the test write `assertThat(...)` without the class name in front. |
+| 4 | `import static org.assertj.core.api.Assertions.assertThatThrownBy;` | AssertJ's `assertThatThrownBy(() -> code)`: runs the code and checks that it throws, then lets the test inspect the exception. |
+| 6 | `import io.plainround.seatholds.domain.SeatId;` | `SeatId`: a class of this repository, from the package `domain`, that this test uses. |
+| 7 | `import io.plainround.seatholds.domain.SeatStore;` | `SeatStore`: a class of this repository, from the package `domain`, that this test uses. |
+| 8 | `import io.plainround.seatholds.infrastructure.SeatStoreContract;` | `SeatStoreContract`: a class of this repository, from the package `infrastructure`, that this test uses. |
+| 9 | `import io.plainround.seatholds.support.PostgresFixture;` | `PostgresFixture`: a class of this repository, from the package `support`, that this test uses. |
+| 10 | `import java.sql.SQLException;` | `SQLException`: the error type for database failures. |
+| 11 | `import org.junit.jupiter.api.Test;` | JUnit's `@Test` marker: a method carrying it is a test that JUnit runs. |
+| 14 | `class JdbcSeatStoreIT extends SeatStoreContract` | The **class** that holds the code below. It has no `public` modifier (package-private): JUnit runs such classes too, so none is needed. Every method marked `@Test` inside it is one test. |
+| 13-13 | the comment | A comment (Javadoc): text for human readers; the compiler ignores it. |
 
 Setup, shared data and helpers:
 
@@ -1302,6 +1805,37 @@ void everyChangeBumpsTheVersionColumn() throws SQLException {
 #### `interfaces/AppConfigTest.java` (4 tests)
 
 Tests the settings reader: the defaults (memory store, ten-minute holds, 30-second sweep, ten seats), a JDBC configuration whose `toString` hides the password, bad values refused with the variable's name, and the JDBC store refused without a URL, a user or a valid pool and timeout.
+
+The top of the file:
+
+```java
+package io.plainround.seatholds.interfaces;
+
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
+
+import io.plainround.seatholds.interfaces.cli.AppConfig;
+import io.plainround.seatholds.interfaces.cli.AppConfig.StoreKind;
+import io.plainround.seatholds.interfaces.cli.ConfigurationException;
+import java.time.Duration;
+import java.util.Map;
+import org.junit.jupiter.api.Test;
+
+class AppConfigTest {
+```
+
+| Line | Code | What it means |
+| --- | --- | --- |
+| 1 | `package io.plainround.seatholds.interfaces;` | The **package** of this class: its folder path under `src/test/java`, written with dots. It matches the package of the code under test, so the test can use that code's non-public parts. |
+| 3 | `import static org.assertj.core.api.Assertions.assertThat;` | AssertJ's `assertThat(actual)`: starts a readable check such as `assertThat(x).isEqualTo(y)`. `static` lets the test write `assertThat(...)` without the class name in front. |
+| 4 | `import static org.assertj.core.api.Assertions.assertThatThrownBy;` | AssertJ's `assertThatThrownBy(() -> code)`: runs the code and checks that it throws, then lets the test inspect the exception. |
+| 6 | `import io.plainround.seatholds.interfaces.cli.AppConfig;` | `AppConfig`: a class of this repository, from the package `interfaces.cli`, that this test uses. |
+| 7 | `import io.plainround.seatholds.interfaces.cli.AppConfig.StoreKind;` | `StoreKind`: a class of this repository, from the package `interfaces.cli.AppConfig`, that this test uses. |
+| 8 | `import io.plainround.seatholds.interfaces.cli.ConfigurationException;` | `ConfigurationException`: a class of this repository, from the package `interfaces.cli`, that this test uses. |
+| 9 | `import java.time.Duration;` | `Duration`: an amount of time (for example 30 seconds). |
+| 10 | `import java.util.Map;` | `Map`: a collection of key-to-value pairs (like a dictionary). |
+| 11 | `import org.junit.jupiter.api.Test;` | JUnit's `@Test` marker: a method carrying it is a test that JUnit runs. |
+| 13 | `class AppConfigTest` | The **class** that holds the code below. It has no `public` modifier (package-private): JUnit runs such classes too, so none is needed. Every method marked `@Test` inside it is one test. |
 
 **Defaults are a memory store ten minute holds and ten seats.**
 
@@ -1401,6 +1935,37 @@ void theJdbcStoreWithoutAUrlOrWithAnEmptyPoolIsRefused() {
 #### `interfaces/CliTest.java` (12 tests)
 
 Tests the command-line driver. `run(env, shutdown, args)` builds a `Cli` with fake streams and a shutdown latch. Tests cover usage, unknown command, bad settings, `health`, `status`, `hold` and `confirm` (argument checks, success, refusal with exit 1, unknown seat), `sweep`, a small `race` (exactly 10 winners), and `serve`: it starts the command on a thread, waits 300 milliseconds, counts the latch down and checks that it stopped cleanly.
+
+The top of the file:
+
+```java
+package io.plainround.seatholds.interfaces;
+
+import static org.assertj.core.api.Assertions.assertThat;
+
+import io.plainround.seatholds.interfaces.cli.Cli;
+import java.io.ByteArrayOutputStream;
+import java.io.PrintStream;
+import java.nio.charset.StandardCharsets;
+import java.util.Map;
+import java.util.concurrent.CountDownLatch;
+import org.junit.jupiter.api.Test;
+
+class CliTest {
+```
+
+| Line | Code | What it means |
+| --- | --- | --- |
+| 1 | `package io.plainround.seatholds.interfaces;` | The **package** of this class: its folder path under `src/test/java`, written with dots. It matches the package of the code under test, so the test can use that code's non-public parts. |
+| 3 | `import static org.assertj.core.api.Assertions.assertThat;` | AssertJ's `assertThat(actual)`: starts a readable check such as `assertThat(x).isEqualTo(y)`. `static` lets the test write `assertThat(...)` without the class name in front. |
+| 5 | `import io.plainround.seatholds.interfaces.cli.Cli;` | `Cli`: a class of this repository, from the package `interfaces.cli`, that this test uses. |
+| 6 | `import java.io.ByteArrayOutputStream;` | `ByteArrayOutputStream`: an output channel that collects what is written into memory, so a test can read it back. |
+| 7 | `import java.io.PrintStream;` | `PrintStream`: an output channel that can print text (what `System.out` is). |
+| 8 | `import java.nio.charset.StandardCharsets;` | `StandardCharsets`: names of text encodings such as UTF-8 (how characters become bytes). |
+| 9 | `import java.util.Map;` | `Map`: a collection of key-to-value pairs (like a dictionary). |
+| 10 | `import java.util.concurrent.CountDownLatch;` | `CountDownLatch`: a counter that threads wait on; it releases all waiting threads at once when it reaches zero. Used to start many threads at the same instant. |
+| 11 | `import org.junit.jupiter.api.Test;` | JUnit's `@Test` marker: a method carrying it is a test that JUnit runs. |
+| 13 | `class CliTest` | The **class** that holds the code below. It has no `public` modifier (package-private): JUnit runs such classes too, so none is needed. Every method marked `@Test` inside it is one test. |
 
 Setup, shared data and helpers:
 
@@ -1575,9 +2140,34 @@ void serveSweepsUntilTheShutdownSignalThenStopsCleanly() throws InterruptedExcep
 
 Not a test: a `Clock` a test can move by hand (`advance`, `set`), starting at a fixed instant. It keeps its time in an `AtomicReference` so threads can read it safely.
 
+The top of the file:
+
+```java
+package io.plainround.seatholds.support;
+
+import io.plainround.seatholds.domain.Clock;
+import java.time.Duration;
+import java.time.Instant;
+import java.util.concurrent.atomic.AtomicReference;
+
+/** A clock the test moves by hand. */
+public final class MutableClock implements Clock {
+```
+
+| Line | Code | What it means |
+| --- | --- | --- |
+| 1 | `package io.plainround.seatholds.support;` | The **package** of this class: its folder path under `src/test/java`, written with dots. It matches the package of the code under test, so the test can use that code's non-public parts. |
+| 3 | `import io.plainround.seatholds.domain.Clock;` | `Clock`: a class of this repository, from the package `domain`, that this test uses. |
+| 4 | `import java.time.Duration;` | `Duration`: an amount of time (for example 30 seconds). |
+| 5 | `import java.time.Instant;` | `Instant`: one exact point on the timeline. |
+| 6 | `import java.util.concurrent.atomic.AtomicReference;` | `AtomicReference`: a box holding one object that several threads can read and replace safely. |
+| 9 | `public final class MutableClock implements Clock` | The **class** that holds the code below. It is `public`, so any class can see it. |
+| 8-8 | the comment | A comment (Javadoc): text for human readers; the compiler ignores it. |
+
 Setup, shared data and helpers:
 
 ```java
+/** The instant the lesson's examples start from. */
 public static final Instant START = Instant.parse("2026-01-01T00:00:00Z");
 
 private final AtomicReference<Instant> now = new AtomicReference<>(START);

@@ -116,7 +116,7 @@ Only what the lesson scopes out:
 ├── config/checkstyle.xml        lint rules (Javadoc on the public surface, no TODOs, no unused imports)
 ├── scripts/audit.py             dependency audit against the OSV database
 ├── docs/adr/                    decision records
-├── tech/                        37 notes, one per technology used here, written for a complete beginner (start at tech/README.md)
+├── tech/                        39 notes, one per technology used here, written for a complete beginner (start at tech/README.md)
 ├── src/main/java/io/plainround/seatholds/
 │   ├── domain/                  SeatState, Outcome, SeatTransitions, the SeatStore and Clock ports: depends on java.* only
 │   ├── application/             HoldSeats, ConfirmHold, ExpireHolds, SeatHoldService: depends on domain
@@ -144,7 +144,7 @@ The dependency rule is enforced by `architecture/ArchitectureTest`; a wrong impo
 
 ## Technology notes
 
-The [tech/](tech/README.md) folder teaches every technology this repository uses, from zero, through the repository's own files: 37 notes, one per language, library, tool, service and file format. Each explains what the technology is, why it is here, how it works underneath, and walks through this repository's own code and settings line by line, with commands to try and five questions to check yourself. Start with the ten-minute shortlist in [tech/README.md](tech/README.md).
+The [tech/](tech/README.md) folder teaches every technology this repository uses, from zero, through the repository's own files: 39 notes, one per language, library, tool, service and file format. Each explains what the technology is, why it is here, how it works underneath, and walks through this repository's own code and settings line by line, with commands to try and five questions to check yourself. Start with the ten-minute shortlist in [tech/README.md](tech/README.md).
 
 ## Verification
 
@@ -156,7 +156,7 @@ What was run, on 2026-10-27, on macOS with Temurin 25.0.2 (CI also targets Java 
 - `JdbcSeatStoreIT` (the identical contract class): 12 of 12, once on Testcontainers and once on the compose database. `JdbcHoldRaceIT` (20 races of 1,000 virtual threads, each `wins=10 losses=990`, and 100 sweep-versus-confirm repetitions): passed on Testcontainers.
 
 - After the last code change (the log timestamp now prints the machine's time-zone offset instead of a fixed `Z`), `make lint` and `make test` (85 tests, coverage gate met) were rerun and pass.
-- Technology notes in `tech/`: every link under "Further reading" was fetched and resolves (the notes were written against the pinned versions; a few statements were checked against the official documentation: JUnit 6 needs Java 17, Surefire and Failsafe default test-name patterns, JaCoCo's `argLine`, checkstyle's `MissingOverride`). A sample of the "Try it yourself" commands was run (the `repl` input, `javap`, `xmllint`, the Ruby YAML one-liner, `make help`, `git check-ignore`); the ones that need Docker or a network failure were not all run.
+- Technology notes in `tech/`: every link under "Further reading" was fetched and resolves (the notes were written against the pinned versions; a few statements were checked against the official documentation: JUnit 6 needs Java 17, Surefire and Failsafe default test-name patterns, JaCoCo's `argLine`, checkstyle's `MissingOverride`). A sample of the "Try it yourself" commands was run (the `repl` input, `javap`, `xmllint`, the Ruby YAML one-liner, `make help`, `git check-ignore`); the ones that need Docker or a network failure were not all run. The Plainround coverage tool (`tools/techcov.py` in the parent folder) reports that 100.0 percent of the non-blank, non-comment lines of every source, script and configuration file are quoted in the notes. `mvnw.cmd` is read and explained line by line but was not run, because this machine runs macOS.
 
 Pending capacity: run `make test-integration` as one command, and `make docker-build && docker run --rm ood-seat-holds:dev`, once the machine is quiet (on 2026-10-28 its load average was above 200, so the Docker checks were not rerun after Docker's disk problem was fixed; the shared-machine rule says to wait for a load under 30). The single-command run was not green on the overloaded machine: the PostgreSQL container took 5 to 8 minutes to start and timed out once, and one run was killed by an outside SIGTERM; the per-class runs above passed. The container image was not built.
 

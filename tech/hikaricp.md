@@ -25,39 +25,52 @@ At start-up Hikari opens connections up to the **maximum pool size**. `getConnec
 
 ## Walkthrough of this repository's use
 
+File: `src/main/java/io/plainround/seatholds/infrastructure/jdbc/PostgresDataSource.java`
+
+**Lines 1 to 7**
+
 ```java
- 1  package io.plainround.seatholds.infrastructure.jdbc;
- 2  
- 3  import com.zaxxer.hikari.HikariConfig;
- 4  import com.zaxxer.hikari.HikariDataSource;
- 5  
- 6  /** Builds the connection pool. The pool is the concurrency limit: a thousand callers share it. */
- 7  public final class PostgresDataSource {
- 8  
- 9    private static final long STARTUP_RETRY_MILLIS = 30_000;
-10  
-11    private PostgresDataSource() {}
-12  
-13    /**
-14     * Opens a pool. If the database is still starting, the pool keeps trying for 30 seconds before
-15     * giving up, and every request for a connection waits at most the configured connection timeout,
-16     * then fails with an exception rather than queueing forever.
-17     *
-18     * @param settings where the database is
-19     * @return a pool the caller must close
-20     */
-21    public static HikariDataSource open(DatabaseSettings settings) {
-22      HikariConfig config = new HikariConfig();
-23      config.setJdbcUrl(settings.url());
-24      config.setUsername(settings.user());
-25      config.setPassword(settings.password());
-26      config.setMaximumPoolSize(settings.poolSize());
-27      config.setConnectionTimeout(settings.connectionTimeout().toMillis());
-28      config.setInitializationFailTimeout(STARTUP_RETRY_MILLIS);
-29      config.setPoolName("seat-holds");
-30      return new HikariDataSource(config);
-31    }
-32  }
+package io.plainround.seatholds.infrastructure.jdbc;
+
+import com.zaxxer.hikari.HikariConfig;
+import com.zaxxer.hikari.HikariDataSource;
+
+/** Builds the connection pool. The pool is the concurrency limit: a thousand callers share it. */
+public final class PostgresDataSource {
+```
+
+**Lines 9 to 21**
+
+```java
+  private static final long STARTUP_RETRY_MILLIS = 30_000;
+
+  private PostgresDataSource() {}
+
+  /**
+   * Opens a pool. If the database is still starting, the pool keeps trying for 30 seconds before
+   * giving up, and every request for a connection waits at most the configured connection timeout,
+   * then fails with an exception rather than queueing forever.
+   *
+   * @param settings where the database is
+   * @return a pool the caller must close
+   */
+  public static HikariDataSource open(DatabaseSettings settings) {
+```
+
+**Lines 22 to 32**
+
+```java
+    HikariConfig config = new HikariConfig();
+    config.setJdbcUrl(settings.url());
+    config.setUsername(settings.user());
+    config.setPassword(settings.password());
+    config.setMaximumPoolSize(settings.poolSize());
+    config.setConnectionTimeout(settings.connectionTimeout().toMillis());
+    config.setInitializationFailTimeout(STARTUP_RETRY_MILLIS);
+    config.setPoolName("seat-holds");
+    return new HikariDataSource(config);
+  }
+}
 ```
 
 | Lines | What they do |

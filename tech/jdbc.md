@@ -32,221 +32,303 @@ The lesson asks for "a JDBC adapter for a real database" that passes the same co
 
 ### `JdbcSeatStore.java`, line by line
 
+File: `src/main/java/io/plainround/seatholds/infrastructure/jdbc/JdbcSeatStore.java`
+
+**Lines 1 to 14**
+
 ```java
-  1  package io.plainround.seatholds.infrastructure.jdbc;
-  2  
-  3  import com.zaxxer.hikari.HikariDataSource;
-  4  import io.plainround.seatholds.domain.CustomerId;
-  5  import io.plainround.seatholds.domain.SeatId;
-  6  import io.plainround.seatholds.domain.SeatState;
-  7  import io.plainround.seatholds.domain.SeatState.Free;
-  8  import io.plainround.seatholds.domain.SeatState.Held;
-  9  import io.plainround.seatholds.domain.SeatState.Sold;
- 10  import io.plainround.seatholds.domain.SeatStore;
- 11  import io.plainround.seatholds.domain.SeatStoreException;
- 12  import io.plainround.seatholds.domain.UnknownSeatException;
- 13  import java.sql.Connection;
- 14  import java.sql.PreparedStatement;
- 15  import java.sql.ResultSet;
- 16  import java.sql.SQLException;
- 17  import java.sql.Types;
- 18  import java.time.Instant;
- 19  import java.time.OffsetDateTime;
- 20  import java.time.ZoneOffset;
- 21  import java.util.ArrayList;
- 22  import java.util.List;
- 23  import javax.sql.DataSource;
- 24  
- 25  /**
- 26   * Stores seats in PostgreSQL ({@code sql/001_schema.sql}). {@link #update} is one conditional
- 27   * {@code UPDATE}: the {@code WHERE} clause matches the state the caller read, so a write based on
- 28   * stale data changes zero rows and returns false, however many servers race. The port speaks in
- 29   * states, not versions, so the clause compares the state columns; the {@code version} column is
- 30   * bumped on every change for auditing.
- 31   */
- 32  public final class JdbcSeatStore implements SeatStore, AutoCloseable {
- 33  
- 34    private static final int QUERY_TIMEOUT_SECONDS = 10;
- 35  
- 36    private static final String SELECT_STATE =
- 37        "SELECT state_type, holder, expires_at FROM seats WHERE seat_id = ?";
- 38    private static final String COMPARE_AND_SET =
- 39        """
- 40        UPDATE seats
- 41           SET state_type = ?, holder = ?::text, expires_at = ?::timestamptz, version = version + 1
- 42         WHERE seat_id = ?
- 43           AND state_type = ?
- 44           AND holder IS NOT DISTINCT FROM ?::text
- 45           AND expires_at IS NOT DISTINCT FROM ?::timestamptz
- 46        """;
- 47    private static final String INSERT_FREE =
- 48        "INSERT INTO seats (seat_id, state_type) VALUES (?, 'FREE') ON CONFLICT (seat_id) DO NOTHING";
- 49    private static final String LIST_SEATS =
- 50        "SELECT seat_id FROM seats ORDER BY seat_id COLLATE \"C\"";
- 51  
- 52    private final DataSource dataSource;
- 53    private final AutoCloseable pool;
- 54  
- 55    /**
- 56     * Creates the store over a data source the caller owns and closes.
- 57     *
- 58     * @param dataSource the connection pool
- 59     */
- 60    public JdbcSeatStore(DataSource dataSource) {
- 61      this.dataSource = dataSource;
- 62      this.pool = () -> {};
- 63    }
- 64  
- 65    private JdbcSeatStore(HikariDataSource dataSource) {
- 66      this.dataSource = dataSource;
- 67      this.pool = dataSource;
- 68    }
- 69  
- 70    /**
- 71     * Opens a connection pool and a store over it; {@link #close} closes the pool.
- 72     *
- 73     * @param settings where the database is
- 74     * @return the store
- 75     */
- 76    public static JdbcSeatStore open(DatabaseSettings settings) {
- 77      return new JdbcSeatStore(PostgresDataSource.open(settings));
- 78    }
- 79  
- 80    @Override
- 81    public void close() {
- 82      try {
- 83        pool.close();
- 84      } catch (Exception failure) {
- 85        throw new SeatStoreException("closing the connection pool", failure);
- 86      }
- 87    }
- 88  
- 89    @Override
- 90    public SeatState get(SeatId seat) {
- 91      try (Connection connection = dataSource.getConnection();
- 92          PreparedStatement statement = prepare(connection, SELECT_STATE)) {
- 93        statement.setString(1, seat.value());
- 94        try (ResultSet row = statement.executeQuery()) {
- 95          if (!row.next()) {
- 96            throw new UnknownSeatException(seat);
- 97          }
- 98          return decode(row);
- 99        }
-100      } catch (SQLException failure) {
-101        throw new SeatStoreException("reading seat " + seat, failure);
-102      }
-103    }
-104  
-105    @Override
-106    public boolean update(SeatId seat, SeatState expected, SeatState next) {
-107      try (Connection connection = dataSource.getConnection();
-108          PreparedStatement statement = prepare(connection, COMPARE_AND_SET)) {
-109        Columns after = Columns.of(next);
-110        Columns before = Columns.of(expected);
-111        statement.setString(1, after.stateType());
-112        setText(statement, 2, after.holder());
-113        setTimestamp(statement, 3, after.expiresAt());
-114        statement.setString(4, seat.value());
-115        statement.setString(5, before.stateType());
-116        setText(statement, 6, before.holder());
-117        setTimestamp(statement, 7, before.expiresAt());
-118        if (statement.executeUpdate() == 1) {
-119          return true;
-120        }
-121        requireKnown(connection, seat);
-122        return false;
-123      } catch (SQLException failure) {
-124        throw new SeatStoreException("updating seat " + seat, failure);
-125      }
-126    }
-127  
-128    @Override
-129    public boolean add(SeatId seat) {
-130      try (Connection connection = dataSource.getConnection();
-131          PreparedStatement statement = prepare(connection, INSERT_FREE)) {
-132        statement.setString(1, seat.value());
-133        return statement.executeUpdate() == 1;
-134      } catch (SQLException failure) {
-135        throw new SeatStoreException("adding seat " + seat, failure);
-136      }
-137    }
-138  
-139    @Override
-140    public List<SeatId> seats() {
-141      try (Connection connection = dataSource.getConnection();
-142          PreparedStatement statement = prepare(connection, LIST_SEATS);
-143          ResultSet rows = statement.executeQuery()) {
-144        List<SeatId> seats = new ArrayList<>();
-145        while (rows.next()) {
-146          seats.add(new SeatId(rows.getString(1)));
-147        }
-148        return List.copyOf(seats);
-149      } catch (SQLException failure) {
-150        throw new SeatStoreException("listing seats", failure);
-151      }
-152    }
-153  
-154    private void requireKnown(Connection connection, SeatId seat) throws SQLException {
-155      try (PreparedStatement statement = prepare(connection, SELECT_STATE)) {
-156        statement.setString(1, seat.value());
-157        try (ResultSet row = statement.executeQuery()) {
-158          if (!row.next()) {
-159            throw new UnknownSeatException(seat);
-160          }
-161        }
-162      }
-163    }
-164  
-165    private static PreparedStatement prepare(Connection connection, String sql) throws SQLException {
-166      PreparedStatement statement = connection.prepareStatement(sql);
-167      statement.setQueryTimeout(QUERY_TIMEOUT_SECONDS);
-168      return statement;
-169    }
-170  
-171    private static void setText(PreparedStatement statement, int index, String value)
-172        throws SQLException {
-173      if (value == null) {
-174        statement.setNull(index, Types.VARCHAR);
-175      } else {
-176        statement.setString(index, value);
-177      }
-178    }
-179  
-180    private static void setTimestamp(PreparedStatement statement, int index, Instant value)
-181        throws SQLException {
-182      if (value == null) {
-183        statement.setNull(index, Types.TIMESTAMP_WITH_TIMEZONE);
-184      } else {
-185        statement.setObject(index, OffsetDateTime.ofInstant(value, ZoneOffset.UTC));
-186      }
-187    }
-188  
-189    private static SeatState decode(ResultSet row) throws SQLException {
-190      String type = row.getString("state_type");
-191      String holder = row.getString("holder");
-192      return switch (type) {
-193        case "FREE" -> new Free();
-194        case "HELD" ->
-195            new Held(
-196                new CustomerId(holder),
-197                row.getObject("expires_at", OffsetDateTime.class).toInstant());
-198        case "SOLD" -> new Sold(new CustomerId(holder));
-199        default -> throw new SeatStoreException("unknown state type in the database: " + type, null);
-200      };
-201    }
-202  
-203    /** A state flattened into the table's columns; the database's CHECK constraint mirrors it. */
-204    private record Columns(String stateType, String holder, Instant expiresAt) {
-205  
-206      static Columns of(SeatState state) {
-207        return switch (state) {
-208          case Free free -> new Columns("FREE", null, null);
-209          case Held held -> new Columns("HELD", held.customer().value(), held.expiresAt());
-210          case Sold sold -> new Columns("SOLD", sold.customer().value(), null);
-211        };
-212      }
-213    }
-214  }
+package io.plainround.seatholds.infrastructure.jdbc;
+
+import com.zaxxer.hikari.HikariDataSource;
+import io.plainround.seatholds.domain.CustomerId;
+import io.plainround.seatholds.domain.SeatId;
+import io.plainround.seatholds.domain.SeatState;
+import io.plainround.seatholds.domain.SeatState.Free;
+import io.plainround.seatholds.domain.SeatState.Held;
+import io.plainround.seatholds.domain.SeatState.Sold;
+import io.plainround.seatholds.domain.SeatStore;
+import io.plainround.seatholds.domain.SeatStoreException;
+import io.plainround.seatholds.domain.UnknownSeatException;
+import java.sql.Connection;
+import java.sql.PreparedStatement;
+```
+
+**Lines 15 to 23**
+
+```java
+import java.sql.ResultSet;
+import java.sql.SQLException;
+import java.sql.Types;
+import java.time.Instant;
+import java.time.OffsetDateTime;
+import java.time.ZoneOffset;
+import java.util.ArrayList;
+import java.util.List;
+import javax.sql.DataSource;
+```
+
+**Lines 25 to 32**
+
+```java
+/**
+ * Stores seats in PostgreSQL ({@code sql/001_schema.sql}). {@link #update} is one conditional
+ * {@code UPDATE}: the {@code WHERE} clause matches the state the caller read, so a write based on
+ * stale data changes zero rows and returns false, however many servers race. The port speaks in
+ * states, not versions, so the clause compares the state columns; the {@code version} column is
+ * bumped on every change for auditing.
+ */
+public final class JdbcSeatStore implements SeatStore, AutoCloseable {
+```
+
+**Lines 34 to 46**
+
+```java
+  private static final int QUERY_TIMEOUT_SECONDS = 10;
+
+  private static final String SELECT_STATE =
+      "SELECT state_type, holder, expires_at FROM seats WHERE seat_id = ?";
+  private static final String COMPARE_AND_SET =
+      """
+      UPDATE seats
+         SET state_type = ?, holder = ?::text, expires_at = ?::timestamptz, version = version + 1
+       WHERE seat_id = ?
+         AND state_type = ?
+         AND holder IS NOT DISTINCT FROM ?::text
+         AND expires_at IS NOT DISTINCT FROM ?::timestamptz
+      """;
+```
+
+**Lines 47 to 53**
+
+```java
+  private static final String INSERT_FREE =
+      "INSERT INTO seats (seat_id, state_type) VALUES (?, 'FREE') ON CONFLICT (seat_id) DO NOTHING";
+  private static final String LIST_SEATS =
+      "SELECT seat_id FROM seats ORDER BY seat_id COLLATE \"C\"";
+
+  private final DataSource dataSource;
+  private final AutoCloseable pool;
+```
+
+**Lines 55 to 63**
+
+```java
+  /**
+   * Creates the store over a data source the caller owns and closes.
+   *
+   * @param dataSource the connection pool
+   */
+  public JdbcSeatStore(DataSource dataSource) {
+    this.dataSource = dataSource;
+    this.pool = () -> {};
+  }
+```
+
+**Lines 65 to 77**
+
+```java
+  private JdbcSeatStore(HikariDataSource dataSource) {
+    this.dataSource = dataSource;
+    this.pool = dataSource;
+  }
+
+  /**
+   * Opens a connection pool and a store over it; {@link #close} closes the pool.
+   *
+   * @param settings where the database is
+   * @return the store
+   */
+  public static JdbcSeatStore open(DatabaseSettings settings) {
+    return new JdbcSeatStore(PostgresDataSource.open(settings));
+```
+
+**Lines 78 to 87**
+
+```java
+  }
+
+  @Override
+  public void close() {
+    try {
+      pool.close();
+    } catch (Exception failure) {
+      throw new SeatStoreException("closing the connection pool", failure);
+    }
+  }
+```
+
+**Lines 89 to 101**
+
+```java
+  @Override
+  public SeatState get(SeatId seat) {
+    try (Connection connection = dataSource.getConnection();
+        PreparedStatement statement = prepare(connection, SELECT_STATE)) {
+      statement.setString(1, seat.value());
+      try (ResultSet row = statement.executeQuery()) {
+        if (!row.next()) {
+          throw new UnknownSeatException(seat);
+        }
+        return decode(row);
+      }
+    } catch (SQLException failure) {
+      throw new SeatStoreException("reading seat " + seat, failure);
+```
+
+**Lines 102 to 115**
+
+```java
+    }
+  }
+
+  @Override
+  public boolean update(SeatId seat, SeatState expected, SeatState next) {
+    try (Connection connection = dataSource.getConnection();
+        PreparedStatement statement = prepare(connection, COMPARE_AND_SET)) {
+      Columns after = Columns.of(next);
+      Columns before = Columns.of(expected);
+      statement.setString(1, after.stateType());
+      setText(statement, 2, after.holder());
+      setTimestamp(statement, 3, after.expiresAt());
+      statement.setString(4, seat.value());
+      statement.setString(5, before.stateType());
+```
+
+**Lines 116 to 126**
+
+```java
+      setText(statement, 6, before.holder());
+      setTimestamp(statement, 7, before.expiresAt());
+      if (statement.executeUpdate() == 1) {
+        return true;
+      }
+      requireKnown(connection, seat);
+      return false;
+    } catch (SQLException failure) {
+      throw new SeatStoreException("updating seat " + seat, failure);
+    }
+  }
+```
+
+**Lines 128 to 137**
+
+```java
+  @Override
+  public boolean add(SeatId seat) {
+    try (Connection connection = dataSource.getConnection();
+        PreparedStatement statement = prepare(connection, INSERT_FREE)) {
+      statement.setString(1, seat.value());
+      return statement.executeUpdate() == 1;
+    } catch (SQLException failure) {
+      throw new SeatStoreException("adding seat " + seat, failure);
+    }
+  }
+```
+
+**Lines 139 to 151**
+
+```java
+  @Override
+  public List<SeatId> seats() {
+    try (Connection connection = dataSource.getConnection();
+        PreparedStatement statement = prepare(connection, LIST_SEATS);
+        ResultSet rows = statement.executeQuery()) {
+      List<SeatId> seats = new ArrayList<>();
+      while (rows.next()) {
+        seats.add(new SeatId(rows.getString(1)));
+      }
+      return List.copyOf(seats);
+    } catch (SQLException failure) {
+      throw new SeatStoreException("listing seats", failure);
+    }
+```
+
+**Lines 152 to 163**
+
+```java
+  }
+
+  private void requireKnown(Connection connection, SeatId seat) throws SQLException {
+    try (PreparedStatement statement = prepare(connection, SELECT_STATE)) {
+      statement.setString(1, seat.value());
+      try (ResultSet row = statement.executeQuery()) {
+        if (!row.next()) {
+          throw new UnknownSeatException(seat);
+        }
+      }
+    }
+  }
+```
+
+**Lines 165 to 169**
+
+```java
+  private static PreparedStatement prepare(Connection connection, String sql) throws SQLException {
+    PreparedStatement statement = connection.prepareStatement(sql);
+    statement.setQueryTimeout(QUERY_TIMEOUT_SECONDS);
+    return statement;
+  }
+```
+
+**Lines 171 to 178**
+
+```java
+  private static void setText(PreparedStatement statement, int index, String value)
+      throws SQLException {
+    if (value == null) {
+      statement.setNull(index, Types.VARCHAR);
+    } else {
+      statement.setString(index, value);
+    }
+  }
+```
+
+**Lines 180 to 187**
+
+```java
+  private static void setTimestamp(PreparedStatement statement, int index, Instant value)
+      throws SQLException {
+    if (value == null) {
+      statement.setNull(index, Types.TIMESTAMP_WITH_TIMEZONE);
+    } else {
+      statement.setObject(index, OffsetDateTime.ofInstant(value, ZoneOffset.UTC));
+    }
+  }
+```
+
+**Lines 189 to 201**
+
+```java
+  private static SeatState decode(ResultSet row) throws SQLException {
+    String type = row.getString("state_type");
+    String holder = row.getString("holder");
+    return switch (type) {
+      case "FREE" -> new Free();
+      case "HELD" ->
+          new Held(
+              new CustomerId(holder),
+              row.getObject("expires_at", OffsetDateTime.class).toInstant());
+      case "SOLD" -> new Sold(new CustomerId(holder));
+      default -> throw new SeatStoreException("unknown state type in the database: " + type, null);
+    };
+  }
+```
+
+**Lines 203 to 214**
+
+```java
+  /** A state flattened into the table's columns; the database's CHECK constraint mirrors it. */
+  private record Columns(String stateType, String holder, Instant expiresAt) {
+
+    static Columns of(SeatState state) {
+      return switch (state) {
+        case Free free -> new Columns("FREE", null, null);
+        case Held held -> new Columns("HELD", held.customer().value(), held.expiresAt());
+        case Sold sold -> new Columns("SOLD", sold.customer().value(), null);
+      };
+    }
+  }
+}
 ```
 
 | Lines | What they do |
@@ -276,57 +358,75 @@ The lesson asks for "a JDBC adapter for a real database" that passes the same co
 
 ### `DatabaseSettings.java`: validated connection settings
 
+File: `src/main/java/io/plainround/seatholds/infrastructure/jdbc/DatabaseSettings.java`
+
+**Lines 1 to 14**
+
 ```java
- 1  package io.plainround.seatholds.infrastructure.jdbc;
- 2  
- 3  import java.time.Duration;
- 4  
- 5  /**
- 6   * Where the database is and how many connections to open. The password comes from the environment
- 7   * and is never printed: {@link #toString} leaves it out.
- 8   *
- 9   * @param url the JDBC URL, such as {@code jdbc:postgresql://localhost:55468/seatholds}
-10   * @param user the database user
-11   * @param password the database password
-12   * @param poolSize the most connections to open, at least one
-13   * @param connectionTimeout how long a caller waits for a free connection before the call fails
-14   */
-15  public record DatabaseSettings(
-16      String url, String user, String password, int poolSize, Duration connectionTimeout) {
-17  
-18    /**
-19     * Validates the settings.
-20     *
-21     * @throws IllegalArgumentException if a part is missing or the pool is empty
-22     */
-23    public DatabaseSettings {
-24      if (url == null || !url.startsWith("jdbc:postgresql:")) {
-25        throw new IllegalArgumentException("DATABASE_URL must be a jdbc:postgresql: URL");
-26      }
-27      if (user == null || user.isBlank() || password == null) {
-28        throw new IllegalArgumentException("DATABASE_USER and DATABASE_PASSWORD are required");
-29      }
-30      if (poolSize < 1) {
-31        throw new IllegalArgumentException("POOL_SIZE must be at least 1, was " + poolSize);
-32      }
-33      if (connectionTimeout == null || connectionTimeout.compareTo(Duration.ofSeconds(1)) < 0) {
-34        throw new IllegalArgumentException("CONNECTION_TIMEOUT must be at least PT1S");
-35      }
-36    }
-37  
-38    @Override
-39    public String toString() {
-40      return "DatabaseSettings[url="
-41          + url
-42          + ", user="
-43          + user
-44          + ", poolSize="
-45          + poolSize
-46          + ", connectionTimeout="
-47          + connectionTimeout
-48          + "]";
-49    }
-50  }
+package io.plainround.seatholds.infrastructure.jdbc;
+
+import java.time.Duration;
+
+/**
+ * Where the database is and how many connections to open. The password comes from the environment
+ * and is never printed: {@link #toString} leaves it out.
+ *
+ * @param url the JDBC URL, such as {@code jdbc:postgresql://localhost:55468/seatholds}
+ * @param user the database user
+ * @param password the database password
+ * @param poolSize the most connections to open, at least one
+ * @param connectionTimeout how long a caller waits for a free connection before the call fails
+ */
+```
+
+**Lines 15 to 28**
+
+```java
+public record DatabaseSettings(
+    String url, String user, String password, int poolSize, Duration connectionTimeout) {
+
+  /**
+   * Validates the settings.
+   *
+   * @throws IllegalArgumentException if a part is missing or the pool is empty
+   */
+  public DatabaseSettings {
+    if (url == null || !url.startsWith("jdbc:postgresql:")) {
+      throw new IllegalArgumentException("DATABASE_URL must be a jdbc:postgresql: URL");
+    }
+    if (user == null || user.isBlank() || password == null) {
+      throw new IllegalArgumentException("DATABASE_USER and DATABASE_PASSWORD are required");
+```
+
+**Lines 29 to 36**
+
+```java
+    }
+    if (poolSize < 1) {
+      throw new IllegalArgumentException("POOL_SIZE must be at least 1, was " + poolSize);
+    }
+    if (connectionTimeout == null || connectionTimeout.compareTo(Duration.ofSeconds(1)) < 0) {
+      throw new IllegalArgumentException("CONNECTION_TIMEOUT must be at least PT1S");
+    }
+  }
+```
+
+**Lines 38 to 50**
+
+```java
+  @Override
+  public String toString() {
+    return "DatabaseSettings[url="
+        + url
+        + ", user="
+        + user
+        + ", poolSize="
+        + poolSize
+        + ", connectionTimeout="
+        + connectionTimeout
+        + "]";
+  }
+}
 ```
 
 | Lines | What they do |
@@ -338,39 +438,52 @@ The lesson asks for "a JDBC adapter for a real database" that passes the same co
 
 ### `PostgresDataSource.java`: the pool
 
+File: `src/main/java/io/plainround/seatholds/infrastructure/jdbc/PostgresDataSource.java`
+
+**Lines 1 to 7**
+
 ```java
- 1  package io.plainround.seatholds.infrastructure.jdbc;
- 2  
- 3  import com.zaxxer.hikari.HikariConfig;
- 4  import com.zaxxer.hikari.HikariDataSource;
- 5  
- 6  /** Builds the connection pool. The pool is the concurrency limit: a thousand callers share it. */
- 7  public final class PostgresDataSource {
- 8  
- 9    private static final long STARTUP_RETRY_MILLIS = 30_000;
-10  
-11    private PostgresDataSource() {}
-12  
-13    /**
-14     * Opens a pool. If the database is still starting, the pool keeps trying for 30 seconds before
-15     * giving up, and every request for a connection waits at most the configured connection timeout,
-16     * then fails with an exception rather than queueing forever.
-17     *
-18     * @param settings where the database is
-19     * @return a pool the caller must close
-20     */
-21    public static HikariDataSource open(DatabaseSettings settings) {
-22      HikariConfig config = new HikariConfig();
-23      config.setJdbcUrl(settings.url());
-24      config.setUsername(settings.user());
-25      config.setPassword(settings.password());
-26      config.setMaximumPoolSize(settings.poolSize());
-27      config.setConnectionTimeout(settings.connectionTimeout().toMillis());
-28      config.setInitializationFailTimeout(STARTUP_RETRY_MILLIS);
-29      config.setPoolName("seat-holds");
-30      return new HikariDataSource(config);
-31    }
-32  }
+package io.plainround.seatholds.infrastructure.jdbc;
+
+import com.zaxxer.hikari.HikariConfig;
+import com.zaxxer.hikari.HikariDataSource;
+
+/** Builds the connection pool. The pool is the concurrency limit: a thousand callers share it. */
+public final class PostgresDataSource {
+```
+
+**Lines 9 to 21**
+
+```java
+  private static final long STARTUP_RETRY_MILLIS = 30_000;
+
+  private PostgresDataSource() {}
+
+  /**
+   * Opens a pool. If the database is still starting, the pool keeps trying for 30 seconds before
+   * giving up, and every request for a connection waits at most the configured connection timeout,
+   * then fails with an exception rather than queueing forever.
+   *
+   * @param settings where the database is
+   * @return a pool the caller must close
+   */
+  public static HikariDataSource open(DatabaseSettings settings) {
+```
+
+**Lines 22 to 32**
+
+```java
+    HikariConfig config = new HikariConfig();
+    config.setJdbcUrl(settings.url());
+    config.setUsername(settings.user());
+    config.setPassword(settings.password());
+    config.setMaximumPoolSize(settings.poolSize());
+    config.setConnectionTimeout(settings.connectionTimeout().toMillis());
+    config.setInitializationFailTimeout(STARTUP_RETRY_MILLIS);
+    config.setPoolName("seat-holds");
+    return new HikariDataSource(config);
+  }
+}
 ```
 
 Explained line by line in `hikaricp.md`.

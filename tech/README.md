@@ -19,6 +19,8 @@ These notes teach every technology this repository uses, from zero, through the 
 | [testcontainers.md](testcontainers.md) | A real PostgreSQL started from the tests. |
 | [maven.md](maven.md) | The build tool and `pom.xml`, including the integration profile. |
 | [maven-wrapper.md](maven-wrapper.md) | `./mvnw`, which pins Maven 3.9.16 with no install. |
+| [mvnw-script.md](mvnw-script.md) | The `mvnw` shell script read line by line. |
+| [mvnw-cmd-powershell.md](mvnw-cmd-powershell.md) | The Windows `mvnw.cmd` (batch and PowerShell in one file) read line by line. |
 | [maven-enforcer.md](maven-enforcer.md) | Build rules: pinned plugins, converged dependencies. |
 | [maven-surefire.md](maven-surefire.md) | The plugin that runs the unit tests. |
 | [maven-failsafe.md](maven-failsafe.md) | The plugin that runs the `*IT` database tests. |
@@ -48,7 +50,7 @@ These notes teach every technology this repository uses, from zero, through the 
 
 1. **The language:** `java.md`, then `java-concurrency.md`.
 2. **The database:** `postgresql.md`, `sql.md`, `jdbc.md`, `hikaricp.md`, `docker-compose.md`.
-3. **The build tool:** `maven-wrapper.md`, `maven.md`, `javac.md`.
+3. **The build tool:** `maven-wrapper.md`, `mvnw-script.md`, `mvnw-cmd-powershell.md`, `maven.md`, `javac.md`.
 4. **The tests:** `junit.md`, `junit-test-walkthrough.md`, `assertj.md`, `archunit.md`, `testcontainers.md`, `maven-surefire.md`, `maven-failsafe.md`, `jacoco.md`.
 5. **The quality checks:** `spotless-google-java-format.md`, `checkstyle.md`, `maven-enforcer.md`, `maven-dependency-plugin.md`, `python.md`, `osv.md`.
 6. **Running and delivering:** `make.md`, `bash-and-shell.md`, `environment-variables.md`, `java-logging.md`, `slf4j.md`, `docker.md`, `git.md`, `github-actions.md`.

@@ -51,41 +51,57 @@ private static void log(String action, SeatId seat, CustomerId customer, Outcome
 
 ### Configuring the output
 
+File: `src/main/java/io/plainround/seatholds/interfaces/cli/Logging.java`
+
+**Lines 1 to 7**
+
 ```java
- 1  package io.plainround.seatholds.interfaces.cli;
- 2  
- 3  import java.util.List;
- 4  import java.util.logging.Handler;
- 5  import java.util.logging.Level;
- 6  import java.util.logging.LogManager;
- 7  import java.util.logging.Logger;
- 8  
- 9  /** Sends the JDK system logger's output to standard error as one {@code key=value} line each. */
-10  final class Logging {
-11  
-12    private static final List<String> LEVELS = List.of("SEVERE", "WARNING", "INFO", "FINE");
-13  
-14    private Logging() {}
-15  
-16    static void requireKnownLevel(String level) {
-17      if (!LEVELS.contains(level)) {
-18        throw new IllegalArgumentException("LOG_LEVEL must be one of " + LEVELS + ", was " + level);
-19      }
-20    }
-21  
-22    static void configure(String level) {
-23      System.setProperty(
-24          "java.util.logging.SimpleFormatter.format", "ts=%1$tFT%1$tT.%1$tL%1$tz level=%4$s %5$s%n");
-25      LogManager.getLogManager().reset();
-26      Logger root = Logger.getLogger("");
-27      root.addHandler(new java.util.logging.ConsoleHandler());
-28      Level parsed = Level.parse(level);
-29      root.setLevel(parsed);
-30      for (Handler handler : root.getHandlers()) {
-31        handler.setLevel(parsed);
-32      }
-33    }
-34  }
+package io.plainround.seatholds.interfaces.cli;
+
+import java.util.List;
+import java.util.logging.Handler;
+import java.util.logging.Level;
+import java.util.logging.LogManager;
+import java.util.logging.Logger;
+```
+
+**Lines 9 to 14**
+
+```java
+/** Sends the JDK system logger's output to standard error as one {@code key=value} line each. */
+final class Logging {
+
+  private static final List<String> LEVELS = List.of("SEVERE", "WARNING", "INFO", "FINE");
+
+  private Logging() {}
+```
+
+**Lines 16 to 20**
+
+```java
+  static void requireKnownLevel(String level) {
+    if (!LEVELS.contains(level)) {
+      throw new IllegalArgumentException("LOG_LEVEL must be one of " + LEVELS + ", was " + level);
+    }
+  }
+```
+
+**Lines 22 to 34**
+
+```java
+  static void configure(String level) {
+    System.setProperty(
+        "java.util.logging.SimpleFormatter.format", "ts=%1$tFT%1$tT.%1$tL%1$tz level=%4$s %5$s%n");
+    LogManager.getLogManager().reset();
+    Logger root = Logger.getLogger("");
+    root.addHandler(new java.util.logging.ConsoleHandler());
+    Level parsed = Level.parse(level);
+    root.setLevel(parsed);
+    for (Handler handler : root.getHandlers()) {
+      handler.setLevel(parsed);
+    }
+  }
+}
 ```
 
 | Lines | What they do |

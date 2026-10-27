@@ -43,6 +43,21 @@ Markdown is only text until a program **renders** it. GitHub's renderer reads ea
 
 The "Done when" section is a four-column table: the number, the lesson's line, the command to run, and what proves it. The row of `| --- |` marks above the first data row is what makes it a table, and the row before them is the header. Putting the proof in a table lets a reader scan each line of the lesson against its evidence.
 
+### Every Markdown file in this repository
+
+| File | Its title (the first heading) | What the file is for |
+| --- | --- | --- |
+| `ARCHITECTURE.md` | Architecture | The design: layers and the dependency rule, the Mermaid class diagram with the lesson's names, the main flows, and where the design bends (`mermaid.md`). |
+| `CHANGELOG.md` | Changelog | What changed in each released version, in the Keep a Changelog layout: a heading per version (`## [0.1.0] - date`) and a sub-heading per kind of change (`### Added`). Version numbers follow Semantic Versioning: MAJOR.MINOR.PATCH, where a breaking change raises MAJOR, a new compatible feature raises MINOR and a fix raises PATCH. |
+| `README.md` | ood-seat-holds | The front page: what the project is, how to run it, the lesson's Done-when lines with their proof, the project tree, the quality gates and the verification record. |
+| `docs/adr/0001-the-guarantee-lives-in-the-store.md` | 0001. "Sold at most once" lives in the store's compare-and-set | One **architecture decision record** (ADR): a short page that saves a decision and the reason for it, in four parts: a Status line, **Context** (the problem and the options), **Decision** (what was chosen) and **Consequences** (what gets easier and what gets harder). A later reader learns why the code looks as it does without asking the author. |
+| `docs/adr/0002-compare-the-state-not-a-version.md` | 0002. The conditional UPDATE compares the state, not a version number | One **architecture decision record** (ADR): a short page that saves a decision and the reason for it, in four parts: a Status line, **Context** (the problem and the options), **Decision** (what was chosen) and **Consequences** (what gets easier and what gets harder). A later reader learns why the code looks as it does without asking the author. |
+| `docs/adr/0003-seat-states-are-data-and-transitions-are-pure.md` | 0003. Seat states are data and transitions are pure functions | One **architecture decision record** (ADR): a short page that saves a decision and the reason for it, in four parts: a Status line, **Context** (the problem and the options), **Decision** (what was chosen) and **Consequences** (what gets easier and what gets harder). A later reader learns why the code looks as it does without asking the author. |
+
+The `LICENSE` file is plain text, not Markdown: it holds the MIT License, which lets anyone use, copy, change and share the code as long as the copyright line and the licence text stay with it, and which says the software comes with no warranty.
+
+Each file is ordinary Markdown: headings, paragraphs, lists, tables and fenced blocks as explained above. The decision records are the plainest: a `#` title, a `- Status:` list item, then three `##` headings (Context, Decision, Consequences). The changelog is a `#` title, a sentence, and one `##` block per version.
+
 ### Headings as structure
 
 `README.md` uses `##` headings in a fixed order (prerequisites, setup and run, done when, stretch goals, simplified for teaching, project structure, quality gates, technology notes, verification, license). Those are the headings the template asks for. A reader (or a tool) can jump from heading to heading.

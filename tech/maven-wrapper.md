@@ -43,67 +43,15 @@ distributionUrl=https://repo.maven.apache.org/maven2/org/apache/maven/apache-mav
 - `distributionType=only-script`: use the script only, no helper jar. (The older style stored a jar in the repository.)
 - `distributionUrl=...apache-maven-3.9.16-bin.zip`: the exact Maven to use, on Maven Central. `-bin` means the ready-to-run build, not the source. **This one line is how the repository pins Maven.** Changing the number changes Maven for everybody.
 
-### The script
+### The scripts
 
-`mvnw` is a long generated script. You do not edit it. These are its parts, in order, with the lines that matter. (Shell syntax such as `${x-}` and `case` is explained in `bash-and-shell.md`.)
+`mvnw` (macOS and Linux) and `mvnw.cmd` (Windows) are long generated scripts. You do not edit them, but nothing in them is hidden: `mvnw-script.md` reads `mvnw` line by line (all 295 lines, with the shell ideas explained where they first appear), and `mvnw-cmd-powershell.md` reads `mvnw.cmd` the same way. In short, `mvnw` does these things, in this order:
 
-**1. Strict mode and tracing.**
-
-```sh
-set -euf
-[ "${MVNW_VERBOSE-}" != debug ] || set -x
-```
-
-`set -euf` turns on three safety switches: `-e` stop at the first command that fails, `-u` treat an unset variable as an error, `-f` turn off filename wildcards (so a `*` in a value is not expanded by accident). The second line turns on `set -x` (print every command) only if you set `MVNW_VERBOSE=debug`. The syntax `[ A ] || B` means "run B only if the test A is false".
-
-**2. Windows path fix.** The `case "$(uname)"` block checks the operating system name (`uname` prints it). On Cygwin or MinGW (Unix-like layers on Windows) it converts paths to the Windows form. On macOS or Linux it does nothing.
-
-**3. Finding Java (`set_java_home`).** The function looks for a Java to use in case it must compile the fallback downloader. If `JAVA_HOME` (an environment variable that points at a JDK folder) is set, it uses `$JAVA_HOME/bin/java`; otherwise it asks the shell where `java` is with `command -v java`. It prints an error and returns 1 if neither works.
-
-**4. Helper functions.** `hash_string` reproduces Java's `String.hashCode` in shell arithmetic so the folder name is stable. `verbose` prints only when `MVNW_VERBOSE=true`. `die` prints a message to standard error (`>&2`) and exits with 1. `trim` strips spaces and line breaks (`tr -d '[:space:]'`) from a value read from the properties file.
-
-**5. Reading the properties file.**
-
-```sh
-while IFS="=" read -r key value; do
-  case "${key-}" in
-  distributionUrl) distributionUrl=$(trim "${value-}") ;;
-  distributionSha256Sum) distributionSha256Sum=$(trim "${value-}") ;;
-  esac
-done <"$scriptDir/.mvn/wrapper/maven-wrapper.properties"
-```
-
-A `while read` loop reads the file one line at a time. `IFS="="` makes `=` the separator, so each line splits into `key` and `value`. The `case` picks out the `distributionUrl` line (and an optional `distributionSha256Sum`). `<"$scriptDir/.mvn/wrapper/maven-wrapper.properties"` feeds the file into the loop. `$scriptDir` is the folder of the script, found with `dirname "$0"` (`$0` is the script's own path), so the wrapper works from any folder.
-
-**6. Choosing the command and the cache folder.** A second `case` looks at the file name in the URL. For a plain Maven zip, `MVN_CMD` becomes `mvn`. Then:
-
-```sh
-MAVEN_USER_HOME="${MAVEN_USER_HOME:-${HOME}/.m2}"
-MAVEN_HOME="${MAVEN_USER_HOME}/wrapper/dists/${distributionUrlNameMain-}/$(hash_string "$distributionUrl")"
-```
-
-`${MAVEN_USER_HOME:-${HOME}/.m2}` means "use `MAVEN_USER_HOME` if set, otherwise `~/.m2`". `MAVEN_HOME` becomes `~/.m2/wrapper/dists/apache-maven-3.9.16/<hash>`: the place this Maven lives.
-
-**7. Run it if it is already there.**
-
-```sh
-exec_maven() {
-  unset MVNW_VERBOSE MVNW_USERNAME MVNW_PASSWORD MVNW_REPOURL || :
-  exec "$MAVEN_HOME/bin/$MVN_CMD" "$@" || die "cannot exec $MAVEN_HOME/bin/$MVN_CMD"
-}
-
-if [ -d "$MAVEN_HOME" ]; then
-  verbose "found existing MAVEN_HOME at $MAVEN_HOME"
-  exec_maven "$@"
-```
-
-`exec_maven` clears the wrapper's own settings from the environment (`unset`), then `exec`s the real Maven with `"$@"`, which means "all the arguments, each kept as one word". If the folder exists the script ends here.
-
-**8. Download.** If not, `mktemp -d` makes a temporary folder; `trap clean HUP INT TERM EXIT` promises to delete it when the script ends in any way (a **trap** runs a command when a signal or exit happens). `mkdir -p` creates the parent folders. The script prefers `wget`, then `curl` (`-f` fail on HTTP errors, `-L` follow redirects, `-o` output file), then the Java fallback: a **here-document** (`cat >file <<-END ... END`) writes a small `Downloader.java`, `javac` compiles it and `java` runs it.
-
-**9. Optional checksum.** If the properties file contains `distributionSha256Sum`, the script computes the file's SHA-256 fingerprint and refuses to continue if it differs. This repository does not set one, so this step is skipped.
-
-**10. Unpack and move.** `unzip` (or `tar xzf`) unpacks into the temporary folder. The script looks for the folder that holds `bin/mvn`, writes the URL into a file `mvnw.url` inside it, and `mv`s it to `MAVEN_HOME`. `clean` removes the temporary folder and `exec_maven "$@"` runs Maven.
+1. Turns on strict mode (`set -euf`) so a failure stops it.
+2. Reads `distributionUrl` from the settings file above.
+3. Works out the cache folder `~/.m2/wrapper/dists/apache-maven-3.9.16/<hash>`.
+4. If that folder exists, replaces itself with Maven (`exec`) and is done.
+5. Otherwise downloads the zip into a temporary folder (with `wget`, else `curl`, else a tiny Java program), optionally checks a SHA-256 checksum, unpacks it, moves it into the cache folder, deletes the temporary folder, and then does step 4.
 
 ## Try it yourself
 

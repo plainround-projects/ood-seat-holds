@@ -39,55 +39,75 @@ The lesson's hard part: "A thousand customers press 'hold' on the last ten seats
 
 ### The atomic store
 
+File: `src/main/java/io/plainround/seatholds/infrastructure/memory/InMemorySeatStore.java`
+
+**Lines 1 to 11**
+
 ```java
- 1  package io.plainround.seatholds.infrastructure.memory;
- 2  
- 3  import io.plainround.seatholds.domain.SeatId;
- 4  import io.plainround.seatholds.domain.SeatState;
- 5  import io.plainround.seatholds.domain.SeatState.Free;
- 6  import io.plainround.seatholds.domain.SeatStore;
- 7  import io.plainround.seatholds.domain.UnknownSeatException;
- 8  import java.util.Comparator;
- 9  import java.util.List;
-10  import java.util.Map;
-11  import java.util.concurrent.ConcurrentHashMap;
-12  
-13  /**
-14   * Keeps seats in a concurrent map. {@link Map#replace(Object, Object, Object)} is an atomic
-15   * compare-and-set: it applies only if the current value equals the expected one, which is exactly
-16   * what the {@link SeatStore} contract asks for.
-17   */
-18  public final class InMemorySeatStore implements SeatStore {
-19  
-20    private final Map<SeatId, SeatState> seats = new ConcurrentHashMap<>();
-21  
-22    @Override
-23    public SeatState get(SeatId seat) {
-24      SeatState state = seats.get(seat);
-25      if (state == null) {
-26        throw new UnknownSeatException(seat);
-27      }
-28      return state;
-29    }
-30  
-31    @Override
-32    public boolean update(SeatId seat, SeatState expected, SeatState next) {
-33      if (!seats.containsKey(seat)) {
-34        throw new UnknownSeatException(seat);
-35      }
-36      return seats.replace(seat, expected, next);
-37    }
-38  
-39    @Override
-40    public boolean add(SeatId seat) {
-41      return seats.putIfAbsent(seat, new Free()) == null;
-42    }
-43  
-44    @Override
-45    public List<SeatId> seats() {
-46      return seats.keySet().stream().sorted(Comparator.comparing(SeatId::value)).toList();
-47    }
-48  }
+package io.plainround.seatholds.infrastructure.memory;
+
+import io.plainround.seatholds.domain.SeatId;
+import io.plainround.seatholds.domain.SeatState;
+import io.plainround.seatholds.domain.SeatState.Free;
+import io.plainround.seatholds.domain.SeatStore;
+import io.plainround.seatholds.domain.UnknownSeatException;
+import java.util.Comparator;
+import java.util.List;
+import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
+```
+
+**Lines 13 to 18**
+
+```java
+/**
+ * Keeps seats in a concurrent map. {@link Map#replace(Object, Object, Object)} is an atomic
+ * compare-and-set: it applies only if the current value equals the expected one, which is exactly
+ * what the {@link SeatStore} contract asks for.
+ */
+public final class InMemorySeatStore implements SeatStore {
+```
+
+**Lines 20 to 29**
+
+```java
+  private final Map<SeatId, SeatState> seats = new ConcurrentHashMap<>();
+
+  @Override
+  public SeatState get(SeatId seat) {
+    SeatState state = seats.get(seat);
+    if (state == null) {
+      throw new UnknownSeatException(seat);
+    }
+    return state;
+  }
+```
+
+**Lines 31 to 37**
+
+```java
+  @Override
+  public boolean update(SeatId seat, SeatState expected, SeatState next) {
+    if (!seats.containsKey(seat)) {
+      throw new UnknownSeatException(seat);
+    }
+    return seats.replace(seat, expected, next);
+  }
+```
+
+**Lines 39 to 48**
+
+```java
+  @Override
+  public boolean add(SeatId seat) {
+    return seats.putIfAbsent(seat, new Free()) == null;
+  }
+
+  @Override
+  public List<SeatId> seats() {
+    return seats.keySet().stream().sorted(Comparator.comparing(SeatId::value)).toList();
+  }
+}
 ```
 
 | Lines | What they do |
@@ -102,144 +122,194 @@ The lesson's hard part: "A thousand customers press 'hold' on the last ten seats
 
 ### The counter-example
 
+File: `src/main/java/io/plainround/seatholds/infrastructure/memory/PlainWriteSeatStore.java`
+
+**Lines 1 to 11**
+
 ```java
- 1  package io.plainround.seatholds.infrastructure.memory;
- 2  
- 3  import io.plainround.seatholds.domain.SeatId;
- 4  import io.plainround.seatholds.domain.SeatState;
- 5  import io.plainround.seatholds.domain.SeatState.Free;
- 6  import io.plainround.seatholds.domain.SeatStore;
- 7  import io.plainround.seatholds.domain.UnknownSeatException;
- 8  import java.util.Comparator;
- 9  import java.util.List;
-10  import java.util.Map;
-11  import java.util.concurrent.ConcurrentHashMap;
-12  
-13  /**
-14   * The mistake the lesson warns about, kept as a counter-example: {@code update} is a plain write
-15   * that ignores {@code expected} and always reports success. Two callers who both read a free seat
-16   * both think they won it, so the seat sells twice. It exists only so the scenario and the tests can
-17   * show that failure; no composition root wires it in.
-18   */
-19  public final class PlainWriteSeatStore implements SeatStore {
-20  
-21    private final Map<SeatId, SeatState> seats = new ConcurrentHashMap<>();
-22  
-23    @Override
-24    public SeatState get(SeatId seat) {
-25      SeatState state = seats.get(seat);
-26      if (state == null) {
-27        throw new UnknownSeatException(seat);
-28      }
-29      return state;
-30    }
-31  
-32    @Override
-33    public boolean update(SeatId seat, SeatState expected, SeatState next) {
-34      if (!seats.containsKey(seat)) {
-35        throw new UnknownSeatException(seat);
-36      }
-37      seats.put(seat, next);
-38      return true;
-39    }
-40  
-41    @Override
-42    public boolean add(SeatId seat) {
-43      return seats.putIfAbsent(seat, new Free()) == null;
-44    }
-45  
-46    @Override
-47    public List<SeatId> seats() {
-48      return seats.keySet().stream().sorted(Comparator.comparing(SeatId::value)).toList();
-49    }
-50  }
+package io.plainround.seatholds.infrastructure.memory;
+
+import io.plainround.seatholds.domain.SeatId;
+import io.plainround.seatholds.domain.SeatState;
+import io.plainround.seatholds.domain.SeatState.Free;
+import io.plainround.seatholds.domain.SeatStore;
+import io.plainround.seatholds.domain.UnknownSeatException;
+import java.util.Comparator;
+import java.util.List;
+import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
+```
+
+**Lines 13 to 19**
+
+```java
+/**
+ * The mistake the lesson warns about, kept as a counter-example: {@code update} is a plain write
+ * that ignores {@code expected} and always reports success. Two callers who both read a free seat
+ * both think they won it, so the seat sells twice. It exists only so the scenario and the tests can
+ * show that failure; no composition root wires it in.
+ */
+public final class PlainWriteSeatStore implements SeatStore {
+```
+
+**Lines 21 to 30**
+
+```java
+  private final Map<SeatId, SeatState> seats = new ConcurrentHashMap<>();
+
+  @Override
+  public SeatState get(SeatId seat) {
+    SeatState state = seats.get(seat);
+    if (state == null) {
+      throw new UnknownSeatException(seat);
+    }
+    return state;
+  }
+```
+
+**Lines 32 to 39**
+
+```java
+  @Override
+  public boolean update(SeatId seat, SeatState expected, SeatState next) {
+    if (!seats.containsKey(seat)) {
+      throw new UnknownSeatException(seat);
+    }
+    seats.put(seat, next);
+    return true;
+  }
+```
+
+**Lines 41 to 50**
+
+```java
+  @Override
+  public boolean add(SeatId seat) {
+    return seats.putIfAbsent(seat, new Free()) == null;
+  }
+
+  @Override
+  public List<SeatId> seats() {
+    return seats.keySet().stream().sorted(Comparator.comparing(SeatId::value)).toList();
+  }
+}
 ```
 
 Identical to the store above except lines 33-39: `update` checks that the seat exists, then `seats.put(seat, next)` **overwrites whatever is there** and `return true` claims success regardless of `expected`. Two callers who both read "free" both think they won. It exists to show the failure (`make run` prints it, `PlainWriteSeatStoreTest`); nothing in production wires it in.
 
 ### The thousand-thread race
 
+File: `src/main/java/io/plainround/seatholds/application/simulation/HoldRace.java`
+
+**Lines 1 to 14**
+
 ```java
- 1  package io.plainround.seatholds.application.simulation;
- 2  
- 3  import io.plainround.seatholds.application.HoldSeats;
- 4  import io.plainround.seatholds.domain.CustomerId;
- 5  import io.plainround.seatholds.domain.Outcome.Success;
- 6  import io.plainround.seatholds.domain.SeatId;
- 7  import java.util.ArrayList;
- 8  import java.util.List;
- 9  import java.util.concurrent.CountDownLatch;
-10  import java.util.concurrent.ExecutionException;
-11  import java.util.concurrent.ExecutorService;
-12  import java.util.concurrent.Executors;
-13  import java.util.concurrent.Future;
-14  import java.util.concurrent.atomic.AtomicInteger;
-15  
-16  /**
-17   * The lesson's race: many customers, each on a virtual thread, press "hold" on a few seats at the
-18   * same moment. Every customer tries the seats one after another, starting at a different seat, and
-19   * stops at the first hold that succeeds, so threads collide on every seat.
-20   */
-21  public final class HoldRace {
-22  
-23    private final HoldSeats holds;
-24  
-25    /**
-26     * Creates a race over a hold use case.
-27     *
-28     * @param holds the inbound port the customers call
-29     */
-30    public HoldRace(HoldSeats holds) {
-31      this.holds = holds;
-32    }
-33  
-34    /**
-35     * Runs one race.
-36     *
-37     * @param seats the seats up for grabs
-38     * @param customers how many customers press hold
-39     * @return how many won a seat and how many were refused every seat
-40     */
-41    public RaceResult run(List<SeatId> seats, int customers) {
-42      AtomicInteger wins = new AtomicInteger();
-43      AtomicInteger losses = new AtomicInteger();
-44      CountDownLatch start = new CountDownLatch(1);
-45      try (ExecutorService pool = Executors.newVirtualThreadPerTaskExecutor()) {
-46        List<Future<?>> running = new ArrayList<>();
-47        for (int index = 0; index < customers; index++) {
-48          CustomerId customer = new CustomerId("customer-" + index);
-49          int firstSeat = index % seats.size();
-50          running.add(
-51              pool.submit(
-52                  () -> {
-53                    start.await();
-54                    (tryAllSeats(seats, firstSeat, customer) ? wins : losses).incrementAndGet();
-55                    return null;
-56                  }));
-57        }
-58        start.countDown();
-59        for (Future<?> customer : running) {
-60          customer.get();
-61        }
-62      } catch (InterruptedException interrupted) {
-63        Thread.currentThread().interrupt();
-64        throw new IllegalStateException("race interrupted", interrupted);
-65      } catch (ExecutionException failed) {
-66        throw new IllegalStateException("a customer's attempt failed", failed.getCause());
-67      }
-68      return new RaceResult(wins.get(), losses.get());
-69    }
-70  
-71    private boolean tryAllSeats(List<SeatId> seats, int firstSeat, CustomerId customer) {
-72      for (int offset = 0; offset < seats.size(); offset++) {
-73        SeatId seat = seats.get((firstSeat + offset) % seats.size());
-74        if (holds.hold(seat, customer) instanceof Success) {
-75          return true;
-76        }
-77      }
-78      return false;
-79    }
-80  }
+package io.plainround.seatholds.application.simulation;
+
+import io.plainround.seatholds.application.HoldSeats;
+import io.plainround.seatholds.domain.CustomerId;
+import io.plainround.seatholds.domain.Outcome.Success;
+import io.plainround.seatholds.domain.SeatId;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
+import java.util.concurrent.atomic.AtomicInteger;
+```
+
+**Lines 16 to 21**
+
+```java
+/**
+ * The lesson's race: many customers, each on a virtual thread, press "hold" on a few seats at the
+ * same moment. Every customer tries the seats one after another, starting at a different seat, and
+ * stops at the first hold that succeeds, so threads collide on every seat.
+ */
+public final class HoldRace {
+```
+
+**Lines 23 to 32**
+
+```java
+  private final HoldSeats holds;
+
+  /**
+   * Creates a race over a hold use case.
+   *
+   * @param holds the inbound port the customers call
+   */
+  public HoldRace(HoldSeats holds) {
+    this.holds = holds;
+  }
+```
+
+**Lines 34 to 46**
+
+```java
+  /**
+   * Runs one race.
+   *
+   * @param seats the seats up for grabs
+   * @param customers how many customers press hold
+   * @return how many won a seat and how many were refused every seat
+   */
+  public RaceResult run(List<SeatId> seats, int customers) {
+    AtomicInteger wins = new AtomicInteger();
+    AtomicInteger losses = new AtomicInteger();
+    CountDownLatch start = new CountDownLatch(1);
+    try (ExecutorService pool = Executors.newVirtualThreadPerTaskExecutor()) {
+      List<Future<?>> running = new ArrayList<>();
+```
+
+**Lines 47 to 60**
+
+```java
+      for (int index = 0; index < customers; index++) {
+        CustomerId customer = new CustomerId("customer-" + index);
+        int firstSeat = index % seats.size();
+        running.add(
+            pool.submit(
+                () -> {
+                  start.await();
+                  (tryAllSeats(seats, firstSeat, customer) ? wins : losses).incrementAndGet();
+                  return null;
+                }));
+      }
+      start.countDown();
+      for (Future<?> customer : running) {
+        customer.get();
+```
+
+**Lines 61 to 69**
+
+```java
+      }
+    } catch (InterruptedException interrupted) {
+      Thread.currentThread().interrupt();
+      throw new IllegalStateException("race interrupted", interrupted);
+    } catch (ExecutionException failed) {
+      throw new IllegalStateException("a customer's attempt failed", failed.getCause());
+    }
+    return new RaceResult(wins.get(), losses.get());
+  }
+```
+
+**Lines 71 to 80**
+
+```java
+  private boolean tryAllSeats(List<SeatId> seats, int firstSeat, CustomerId customer) {
+    for (int offset = 0; offset < seats.size(); offset++) {
+      SeatId seat = seats.get((firstSeat + offset) % seats.size());
+      if (holds.hold(seat, customer) instanceof Success) {
+        return true;
+      }
+    }
+    return false;
+  }
+}
 ```
 
 | Lines | What they do |
@@ -258,134 +328,177 @@ Identical to the store above except lines 33-39: `update` checks that the seat e
 | 68 | Returns the totals as a `RaceResult`. |
 | 71-79 | `tryAllSeats`: starting at the customer's first seat, tries each seat in turn (`(firstSeat + offset) % seats.size()` wraps around the list). `holds.hold(seat, customer) instanceof Success` is true if the hold worked, and the customer stops with `true`. If all ten refuse, `false`. Because every customer tries every seat, threads **collide on every seat**. |
 
+File: `src/main/java/io/plainround/seatholds/application/simulation/RaceResult.java`
+
+**Lines 1 to 9**
+
 ```java
- 1  package io.plainround.seatholds.application.simulation;
- 2  
- 3  /**
- 4   * The count after a race for seats.
- 5   *
- 6   * @param wins customers who ended up holding a seat
- 7   * @param losses customers who were refused every seat
- 8   */
- 9  public record RaceResult(int wins, int losses) {
-10  
-11    @Override
-12    public String toString() {
-13      return "wins=" + wins + " losses=" + losses;
-14    }
-15  }
+package io.plainround.seatholds.application.simulation;
+
+/**
+ * The count after a race for seats.
+ *
+ * @param wins customers who ended up holding a seat
+ * @param losses customers who were refused every seat
+ */
+public record RaceResult(int wins, int losses) {
+```
+
+**Lines 11 to 15**
+
+```java
+  @Override
+  public String toString() {
+    return "wins=" + wins + " losses=" + losses;
+  }
+}
 ```
 
 A two-number record. `toString` (lines 11-14) prints `wins=10 losses=990`, the format of the lesson's expected output.
 
 ### The confirm-versus-sweep race
 
+File: `src/main/java/io/plainround/seatholds/application/simulation/SweepConfirmRace.java`
+
+**Lines 1 to 14**
+
 ```java
-  1  package io.plainround.seatholds.application.simulation;
-  2  
-  3  import io.plainround.seatholds.application.SeatHoldService;
-  4  import io.plainround.seatholds.domain.Clock;
-  5  import io.plainround.seatholds.domain.CustomerId;
-  6  import io.plainround.seatholds.domain.Outcome.Success;
-  7  import io.plainround.seatholds.domain.SeatId;
-  8  import io.plainround.seatholds.domain.SeatState;
-  9  import io.plainround.seatholds.domain.SeatStore;
- 10  import java.time.Duration;
- 11  import java.time.Instant;
- 12  import java.util.concurrent.CountDownLatch;
- 13  import java.util.concurrent.ExecutionException;
- 14  import java.util.concurrent.ExecutorService;
- 15  import java.util.concurrent.Executors;
- 16  import java.util.concurrent.Future;
- 17  import java.util.concurrent.TimeUnit;
- 18  import java.util.concurrent.TimeoutException;
- 19  
- 20  /**
- 21   * The lesson's subtle race: a confirm and the expiry sweep meet on one seat at the same moment.
- 22   *
- 23   * <p>The confirm's clock says the hold is still valid and the sweeper's clock says it has expired,
- 24   * so each decides, correctly by its own time, to move the seat somewhere different. Both reads
- 25   * happen before either write (a rendezvous inside the store makes that certain, not likely), so the
- 26   * two compare-and-set calls compete on the identical state and exactly one can win.
- 27   */
- 28  public final class SweepConfirmRace {
- 29  
- 30    private static final Duration HOLD = Duration.ofMinutes(10);
- 31    private static final Instant HELD_AT = Instant.parse("2026-01-01T00:00:00Z");
- 32    private static final CustomerId ADA = new CustomerId("ada");
- 33  
- 34    /**
- 35     * What one repetition ended as.
- 36     *
- 37     * @param finalState the seat's state afterwards: sold to ada or free, never anything else
- 38     * @param confirmed whether the confirm reported success
- 39     * @param released how many holds the sweeper reported releasing
- 40     */
- 41    public record Repetition(SeatState finalState, boolean confirmed, int released) {
- 42  
- 43      /**
- 44       * Whether the repetition ended in exactly one of the two legal ways, with the two callers'
- 45       * reports agreeing with the seat.
- 46       *
- 47       * @return true if the seat is sold and the confirm won, or free and the sweep won
- 48       */
- 49      public boolean isConsistent() {
- 50        return (finalState instanceof SeatState.Sold && confirmed && released == 0)
- 51            || (finalState instanceof SeatState.Free && !confirmed && released == 1);
- 52      }
- 53    }
- 54  
- 55    private final SeatStore store;
- 56  
- 57    /**
- 58     * Creates the race over a store.
- 59     *
- 60     * @param store the store under test
- 61     */
- 62    public SweepConfirmRace(SeatStore store) {
- 63      this.store = store;
- 64    }
- 65  
- 66    /**
- 67     * Runs one repetition on a fresh seat.
- 68     *
- 69     * @param seat a seat id not used before
- 70     * @return how it ended
- 71     */
- 72    public Repetition run(SeatId seat) {
- 73      store.add(seat);
- 74      var rendezvous = new RendezvousSeatStore(store, 2);
- 75      Clock beforeExpiry = () -> HELD_AT.plus(HOLD).minusSeconds(1);
- 76      Clock afterExpiry = () -> HELD_AT.plus(HOLD).plusSeconds(1);
- 77      new SeatHoldService(store, () -> HELD_AT, HOLD).hold(seat, ADA);
- 78      var confirmer = new SeatHoldService(rendezvous, beforeExpiry, HOLD);
- 79      var sweeper = new SeatHoldService(rendezvous, afterExpiry, HOLD);
- 80      try (ExecutorService pool = Executors.newVirtualThreadPerTaskExecutor()) {
- 81        CountDownLatch start = new CountDownLatch(1);
- 82        Future<Boolean> confirm =
- 83            pool.submit(
- 84                () -> {
- 85                  start.await();
- 86                  return confirmer.confirm(seat, ADA) instanceof Success;
- 87                });
- 88        Future<Boolean> sweep =
- 89            pool.submit(
- 90                () -> {
- 91                  start.await();
- 92                  return sweeper.release(seat) instanceof Success;
- 93                });
- 94        start.countDown();
- 95        boolean confirmed = confirm.get(30, TimeUnit.SECONDS);
- 96        boolean released = sweep.get(30, TimeUnit.SECONDS);
- 97        return new Repetition(store.get(seat), confirmed, released ? 1 : 0);
- 98      } catch (InterruptedException interrupted) {
- 99        Thread.currentThread().interrupt();
-100        throw new IllegalStateException("race interrupted", interrupted);
-101      } catch (ExecutionException | TimeoutException failed) {
-102        throw new IllegalStateException("the race did not finish", failed);
-103      }
-104    }
-105  }
+package io.plainround.seatholds.application.simulation;
+
+import io.plainround.seatholds.application.SeatHoldService;
+import io.plainround.seatholds.domain.Clock;
+import io.plainround.seatholds.domain.CustomerId;
+import io.plainround.seatholds.domain.Outcome.Success;
+import io.plainround.seatholds.domain.SeatId;
+import io.plainround.seatholds.domain.SeatState;
+import io.plainround.seatholds.domain.SeatStore;
+import java.time.Duration;
+import java.time.Instant;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.ExecutorService;
+```
+
+**Lines 15 to 28**
+
+```java
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
+
+/**
+ * The lesson's subtle race: a confirm and the expiry sweep meet on one seat at the same moment.
+ *
+ * <p>The confirm's clock says the hold is still valid and the sweeper's clock says it has expired,
+ * so each decides, correctly by its own time, to move the seat somewhere different. Both reads
+ * happen before either write (a rendezvous inside the store makes that certain, not likely), so the
+ * two compare-and-set calls compete on the identical state and exactly one can win.
+ */
+public final class SweepConfirmRace {
+```
+
+**Lines 30 to 41**
+
+```java
+  private static final Duration HOLD = Duration.ofMinutes(10);
+  private static final Instant HELD_AT = Instant.parse("2026-01-01T00:00:00Z");
+  private static final CustomerId ADA = new CustomerId("ada");
+
+  /**
+   * What one repetition ended as.
+   *
+   * @param finalState the seat's state afterwards: sold to ada or free, never anything else
+   * @param confirmed whether the confirm reported success
+   * @param released how many holds the sweeper reported releasing
+   */
+  public record Repetition(SeatState finalState, boolean confirmed, int released) {
+```
+
+**Lines 43 to 53**
+
+```java
+    /**
+     * Whether the repetition ended in exactly one of the two legal ways, with the two callers'
+     * reports agreeing with the seat.
+     *
+     * @return true if the seat is sold and the confirm won, or free and the sweep won
+     */
+    public boolean isConsistent() {
+      return (finalState instanceof SeatState.Sold && confirmed && released == 0)
+          || (finalState instanceof SeatState.Free && !confirmed && released == 1);
+    }
+  }
+```
+
+**Lines 55 to 64**
+
+```java
+  private final SeatStore store;
+
+  /**
+   * Creates the race over a store.
+   *
+   * @param store the store under test
+   */
+  public SweepConfirmRace(SeatStore store) {
+    this.store = store;
+  }
+```
+
+**Lines 66 to 78**
+
+```java
+  /**
+   * Runs one repetition on a fresh seat.
+   *
+   * @param seat a seat id not used before
+   * @return how it ended
+   */
+  public Repetition run(SeatId seat) {
+    store.add(seat);
+    var rendezvous = new RendezvousSeatStore(store, 2);
+    Clock beforeExpiry = () -> HELD_AT.plus(HOLD).minusSeconds(1);
+    Clock afterExpiry = () -> HELD_AT.plus(HOLD).plusSeconds(1);
+    new SeatHoldService(store, () -> HELD_AT, HOLD).hold(seat, ADA);
+    var confirmer = new SeatHoldService(rendezvous, beforeExpiry, HOLD);
+```
+
+**Lines 79 to 92**
+
+```java
+    var sweeper = new SeatHoldService(rendezvous, afterExpiry, HOLD);
+    try (ExecutorService pool = Executors.newVirtualThreadPerTaskExecutor()) {
+      CountDownLatch start = new CountDownLatch(1);
+      Future<Boolean> confirm =
+          pool.submit(
+              () -> {
+                start.await();
+                return confirmer.confirm(seat, ADA) instanceof Success;
+              });
+      Future<Boolean> sweep =
+          pool.submit(
+              () -> {
+                start.await();
+                return sweeper.release(seat) instanceof Success;
+```
+
+**Lines 93 to 105**
+
+```java
+              });
+      start.countDown();
+      boolean confirmed = confirm.get(30, TimeUnit.SECONDS);
+      boolean released = sweep.get(30, TimeUnit.SECONDS);
+      return new Repetition(store.get(seat), confirmed, released ? 1 : 0);
+    } catch (InterruptedException interrupted) {
+      Thread.currentThread().interrupt();
+      throw new IllegalStateException("race interrupted", interrupted);
+    } catch (ExecutionException | TimeoutException failed) {
+      throw new IllegalStateException("the race did not finish", failed);
+    }
+  }
+}
 ```
 
 | Lines | What they do |
@@ -407,77 +520,109 @@ A two-number record. `toString` (lines 11-14) prints `wins=10 losses=990`, the f
 
 ### Making the collision certain
 
+File: `src/main/java/io/plainround/seatholds/application/simulation/RendezvousSeatStore.java`
+
+**Lines 1 to 9**
+
 ```java
- 1  package io.plainround.seatholds.application.simulation;
- 2  
- 3  import io.plainround.seatholds.domain.SeatId;
- 4  import io.plainround.seatholds.domain.SeatState;
- 5  import io.plainround.seatholds.domain.SeatStore;
- 6  import java.time.Duration;
- 7  import java.util.List;
- 8  import java.util.concurrent.CountDownLatch;
- 9  import java.util.concurrent.TimeUnit;
-10  
-11  /**
-12   * A store decorator for the sweep-versus-confirm race: the first read by each participating thread
-13   * waits until every participant has read. That makes "both decided on the same state before either
-14   * wrote" certain instead of merely likely, so the compare-and-set is exercised on every repetition.
-15   */
-16  final class RendezvousSeatStore implements SeatStore {
-17  
-18    private final SeatStore delegate;
-19    private final CountDownLatch everyoneHasRead;
-20    private final Duration patience;
-21    private final ThreadLocal<Boolean> arrived = ThreadLocal.withInitial(() -> Boolean.FALSE);
-22  
-23    RendezvousSeatStore(SeatStore delegate, int participants) {
-24      this(delegate, participants, Duration.ofSeconds(30));
-25    }
-26  
-27    RendezvousSeatStore(SeatStore delegate, int participants, Duration patience) {
-28      this.delegate = delegate;
-29      this.everyoneHasRead = new CountDownLatch(participants);
-30      this.patience = patience;
-31    }
-32  
-33    @Override
-34    public SeatState get(SeatId seat) {
-35      SeatState state = delegate.get(seat);
-36      if (!arrived.get()) {
-37        arrived.set(Boolean.TRUE);
-38        everyoneHasRead.countDown();
-39        awaitTheOthers();
-40      }
-41      return state;
-42    }
-43  
-44    private void awaitTheOthers() {
-45      try {
-46        if (!everyoneHasRead.await(patience.toMillis(), TimeUnit.MILLISECONDS)) {
-47          throw new IllegalStateException("the other participant never read the seat");
-48        }
-49      } catch (InterruptedException interrupted) {
-50        Thread.currentThread().interrupt();
-51        throw new IllegalStateException(
-52            "interrupted while waiting for the other reader", interrupted);
-53      }
-54    }
-55  
-56    @Override
-57    public boolean update(SeatId seat, SeatState expected, SeatState next) {
-58      return delegate.update(seat, expected, next);
-59    }
-60  
-61    @Override
-62    public boolean add(SeatId seat) {
-63      return delegate.add(seat);
-64    }
-65  
-66    @Override
-67    public List<SeatId> seats() {
-68      return delegate.seats();
-69    }
-70  }
+package io.plainround.seatholds.application.simulation;
+
+import io.plainround.seatholds.domain.SeatId;
+import io.plainround.seatholds.domain.SeatState;
+import io.plainround.seatholds.domain.SeatStore;
+import java.time.Duration;
+import java.util.List;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.TimeUnit;
+```
+
+**Lines 11 to 16**
+
+```java
+/**
+ * A store decorator for the sweep-versus-confirm race: the first read by each participating thread
+ * waits until every participant has read. That makes "both decided on the same state before either
+ * wrote" certain instead of merely likely, so the compare-and-set is exercised on every repetition.
+ */
+final class RendezvousSeatStore implements SeatStore {
+```
+
+**Lines 18 to 25**
+
+```java
+  private final SeatStore delegate;
+  private final CountDownLatch everyoneHasRead;
+  private final Duration patience;
+  private final ThreadLocal<Boolean> arrived = ThreadLocal.withInitial(() -> Boolean.FALSE);
+
+  RendezvousSeatStore(SeatStore delegate, int participants) {
+    this(delegate, participants, Duration.ofSeconds(30));
+  }
+```
+
+**Lines 27 to 31**
+
+```java
+  RendezvousSeatStore(SeatStore delegate, int participants, Duration patience) {
+    this.delegate = delegate;
+    this.everyoneHasRead = new CountDownLatch(participants);
+    this.patience = patience;
+  }
+```
+
+**Lines 33 to 42**
+
+```java
+  @Override
+  public SeatState get(SeatId seat) {
+    SeatState state = delegate.get(seat);
+    if (!arrived.get()) {
+      arrived.set(Boolean.TRUE);
+      everyoneHasRead.countDown();
+      awaitTheOthers();
+    }
+    return state;
+  }
+```
+
+**Lines 44 to 54**
+
+```java
+  private void awaitTheOthers() {
+    try {
+      if (!everyoneHasRead.await(patience.toMillis(), TimeUnit.MILLISECONDS)) {
+        throw new IllegalStateException("the other participant never read the seat");
+      }
+    } catch (InterruptedException interrupted) {
+      Thread.currentThread().interrupt();
+      throw new IllegalStateException(
+          "interrupted while waiting for the other reader", interrupted);
+    }
+  }
+```
+
+**Lines 56 to 64**
+
+```java
+  @Override
+  public boolean update(SeatId seat, SeatState expected, SeatState next) {
+    return delegate.update(seat, expected, next);
+  }
+
+  @Override
+  public boolean add(SeatId seat) {
+    return delegate.add(seat);
+  }
+```
+
+**Lines 66 to 70**
+
+```java
+  @Override
+  public List<SeatId> seats() {
+    return delegate.seats();
+  }
+}
 ```
 
 | Lines | What they do |
@@ -491,67 +636,91 @@ A two-number record. `toString` (lines 11-14) prints `wins=10 losses=990`, the f
 
 ### The scheduled sweeper
 
+File: `src/main/java/io/plainround/seatholds/infrastructure/scheduling/ScheduledSweeper.java`
+
+**Lines 1 to 9**
+
 ```java
- 1  package io.plainround.seatholds.infrastructure.scheduling;
- 2  
- 3  import io.plainround.seatholds.application.ExpireHolds;
- 4  import java.lang.System.Logger;
- 5  import java.lang.System.Logger.Level;
- 6  import java.time.Duration;
- 7  import java.util.concurrent.Executors;
- 8  import java.util.concurrent.ScheduledExecutorService;
- 9  import java.util.concurrent.TimeUnit;
-10  
-11  /**
-12   * Runs the expiry sweep on a fixed delay and stops cleanly: {@link #close} lets a sweep in progress
-13   * finish, then ends the thread. A sweep that throws is logged and the next one still runs.
-14   */
-15  public final class ScheduledSweeper implements AutoCloseable {
-16  
-17    private static final Logger LOG = System.getLogger(ScheduledSweeper.class.getName());
-18    private static final Duration SHUTDOWN_WAIT = Duration.ofSeconds(10);
-19  
-20    private final ScheduledExecutorService executor =
-21        Executors.newSingleThreadScheduledExecutor(
-22            task -> {
-23              Thread thread = new Thread(task, "hold-sweeper");
-24              thread.setDaemon(true);
-25              return thread;
-26            });
-27  
-28    /**
-29     * Starts sweeping.
-30     *
-31     * @param holds the use case to run
-32     * @param every the delay between the end of one sweep and the start of the next
-33     */
-34    public ScheduledSweeper(ExpireHolds holds, Duration every) {
-35      executor.scheduleWithFixedDelay(
-36          () -> sweepOnce(holds), every.toMillis(), every.toMillis(), TimeUnit.MILLISECONDS);
-37    }
-38  
-39    private static void sweepOnce(ExpireHolds holds) {
-40      try {
-41        int released = holds.sweep();
-42        LOG.log(Level.DEBUG, "event=sweep released={0}", released);
-43      } catch (RuntimeException failure) {
-44        LOG.log(Level.ERROR, "event=sweep_failed error={0}", failure.toString());
-45      }
-46    }
-47  
-48    @Override
-49    public void close() {
-50      executor.shutdown();
-51      try {
-52        if (!executor.awaitTermination(SHUTDOWN_WAIT.toMillis(), TimeUnit.MILLISECONDS)) {
-53          executor.shutdownNow();
-54        }
-55      } catch (InterruptedException interrupted) {
-56        executor.shutdownNow();
-57        Thread.currentThread().interrupt();
-58      }
-59    }
-60  }
+package io.plainround.seatholds.infrastructure.scheduling;
+
+import io.plainround.seatholds.application.ExpireHolds;
+import java.lang.System.Logger;
+import java.lang.System.Logger.Level;
+import java.time.Duration;
+import java.util.concurrent.Executors;
+import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.TimeUnit;
+```
+
+**Lines 11 to 15**
+
+```java
+/**
+ * Runs the expiry sweep on a fixed delay and stops cleanly: {@link #close} lets a sweep in progress
+ * finish, then ends the thread. A sweep that throws is logged and the next one still runs.
+ */
+public final class ScheduledSweeper implements AutoCloseable {
+```
+
+**Lines 17 to 26**
+
+```java
+  private static final Logger LOG = System.getLogger(ScheduledSweeper.class.getName());
+  private static final Duration SHUTDOWN_WAIT = Duration.ofSeconds(10);
+
+  private final ScheduledExecutorService executor =
+      Executors.newSingleThreadScheduledExecutor(
+          task -> {
+            Thread thread = new Thread(task, "hold-sweeper");
+            thread.setDaemon(true);
+            return thread;
+          });
+```
+
+**Lines 28 to 37**
+
+```java
+  /**
+   * Starts sweeping.
+   *
+   * @param holds the use case to run
+   * @param every the delay between the end of one sweep and the start of the next
+   */
+  public ScheduledSweeper(ExpireHolds holds, Duration every) {
+    executor.scheduleWithFixedDelay(
+        () -> sweepOnce(holds), every.toMillis(), every.toMillis(), TimeUnit.MILLISECONDS);
+  }
+```
+
+**Lines 39 to 46**
+
+```java
+  private static void sweepOnce(ExpireHolds holds) {
+    try {
+      int released = holds.sweep();
+      LOG.log(Level.DEBUG, "event=sweep released={0}", released);
+    } catch (RuntimeException failure) {
+      LOG.log(Level.ERROR, "event=sweep_failed error={0}", failure.toString());
+    }
+  }
+```
+
+**Lines 48 to 60**
+
+```java
+  @Override
+  public void close() {
+    executor.shutdown();
+    try {
+      if (!executor.awaitTermination(SHUTDOWN_WAIT.toMillis(), TimeUnit.MILLISECONDS)) {
+        executor.shutdownNow();
+      }
+    } catch (InterruptedException interrupted) {
+      executor.shutdownNow();
+      Thread.currentThread().interrupt();
+    }
+  }
+}
 ```
 
 | Lines | What they do |
@@ -565,46 +734,64 @@ A two-number record. `toString` (lines 11-14) prints `wins=10 losses=990`, the f
 
 ### The graceful stop
 
+File: `src/main/java/io/plainround/seatholds/interfaces/cli/Main.java`
+
+**Lines 1 to 7**
+
 ```java
- 1  package io.plainround.seatholds.interfaces.cli;
- 2  
- 3  import java.time.Duration;
- 4  import java.util.concurrent.CountDownLatch;
- 5  
- 6  /** Entry point of the {@code seatholds} command. */
- 7  public final class Main {
- 8  
- 9    private static final Duration SHUTDOWN_WAIT = Duration.ofSeconds(15);
-10  
-11    private Main() {}
-12  
-13    /**
-14     * Runs the command and exits with its code. SIGINT and SIGTERM make {@code serve} stop: the
-15     * signal's shutdown hook releases it and then waits for the main thread, so the sweep in progress
-16     * finishes, the pool closes and the exit code is the command's own, not 143.
-17     *
-18     * @param args the command line, see {@link Cli}
-19     */
-20    public static void main(String[] args) {
-21      CountDownLatch shutdown = new CountDownLatch(1);
-22      Thread main = Thread.currentThread();
-23      Runtime.getRuntime()
-24          .addShutdownHook(
-25              new Thread(
-26                  () -> {
-27                    shutdown.countDown();
-28                    try {
-29                      main.join(SHUTDOWN_WAIT.toMillis());
-30                    } catch (InterruptedException interrupted) {
-31                      Thread.currentThread().interrupt();
-32                    }
-33                  },
-34                  "shutdown-signal"));
-35      int exitCode = new Cli(System.getenv(), System.out, System.err, shutdown).run(args);
-36      System.out.flush();
-37      Runtime.getRuntime().halt(exitCode);
-38    }
-39  }
+package io.plainround.seatholds.interfaces.cli;
+
+import java.time.Duration;
+import java.util.concurrent.CountDownLatch;
+
+/** Entry point of the {@code seatholds} command. */
+public final class Main {
+```
+
+**Lines 9 to 21**
+
+```java
+  private static final Duration SHUTDOWN_WAIT = Duration.ofSeconds(15);
+
+  private Main() {}
+
+  /**
+   * Runs the command and exits with its code. SIGINT and SIGTERM make {@code serve} stop: the
+   * signal's shutdown hook releases it and then waits for the main thread, so the sweep in progress
+   * finishes, the pool closes and the exit code is the command's own, not 143.
+   *
+   * @param args the command line, see {@link Cli}
+   */
+  public static void main(String[] args) {
+    CountDownLatch shutdown = new CountDownLatch(1);
+```
+
+**Lines 22 to 35**
+
+```java
+    Thread main = Thread.currentThread();
+    Runtime.getRuntime()
+        .addShutdownHook(
+            new Thread(
+                () -> {
+                  shutdown.countDown();
+                  try {
+                    main.join(SHUTDOWN_WAIT.toMillis());
+                  } catch (InterruptedException interrupted) {
+                    Thread.currentThread().interrupt();
+                  }
+                },
+                "shutdown-signal"));
+    int exitCode = new Cli(System.getenv(), System.out, System.err, shutdown).run(args);
+```
+
+**Lines 36 to 39**
+
+```java
+    System.out.flush();
+    Runtime.getRuntime().halt(exitCode);
+  }
+}
 ```
 
 | Lines | What they do |
