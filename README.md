@@ -141,6 +141,17 @@ The dependency rule is enforced by `architecture/ArchitectureTest`; a wrong impo
 
 `make check` runs the formatter check, the compiler with `-Xlint:all -Werror` (the type check), checkstyle, all unit, architecture and end-to-end tests, and a JaCoCo gate: the `domain`, `application` and `application.simulation` packages must keep at least 95 percent line and 90 percent branch coverage. `make test-integration` adds the PostgreSQL tests. `make audit` queries the OSV database for every resolved dependency. CI ([.github/workflows/ci.yml](.github/workflows/ci.yml)) runs `make check` and `make run` on Java 21 and 25, `make test-integration` once, and `make audit` once.
 
+## Verification
+
+What was run, on 2026-10-27, on macOS with Temurin 25.0.2 (CI also targets Java 21):
+
+- Fresh clone, following this README from the top: `make test` (85 tests, coverage gate met), `make lint` and `make run` pass, and `git status` is clean afterwards.
+- `make audit`: 40 dependencies, 0 known advisories (after pinning `commons-compress` 1.28.0).
+- `make up`, `make queries` and `make run-jdbc` on PostgreSQL 18 from `docker-compose.yml`: all pass (with `CONNECTION_TIMEOUT=PT10M`, because the machine was saturated). `serve` stops cleanly on SIGTERM and exits 0.
+- `JdbcSeatStoreIT` (the identical contract class): 12 of 12, once on Testcontainers and once on the compose database. `JdbcHoldRaceIT` (20 races of 1,000 virtual threads, each `wins=10 losses=990`, and 100 sweep-versus-confirm repetitions): passed on Testcontainers.
+
+Pending capacity: run `make test-integration` as one command, and `make docker-build && docker run --rm ood-seat-holds:dev`, after Docker Desktop is restarted with free disk (Docker.raw was at its 60 GiB cap on 2026-10-28). The single-command run was not green on the overloaded machine: the PostgreSQL container took 5 to 8 minutes to start and timed out once, and one run was killed by an outside SIGTERM; the per-class runs above passed. The container image was not built.
+
 ## License
 
 MIT, see [LICENSE](LICENSE). Copyright (c) 2026 Sumit Srivastava.
