@@ -54,7 +54,23 @@ Then `java -cp target/classes io.plainround.seatholds.interfaces.cli.Main` start
 - `<release>${maven.compiler.release}</release>` reads the property `21` from the top of the POM: the `--release 21` flag.
 - `<showWarnings>true</showWarnings>` makes Maven print the compiler's warnings (it hides some by default).
 - `<compilerArgs>` passes extra flags straight to `javac`:
-  - `-Xlint:all` turns on **every** optional warning category: unchecked casts, deprecated calls, a resource that is never used, a missing `serialVersionUID`, fall-through in a `switch`, and more.
+  - `-Xlint:all` turns on **every** optional warning category. `javac --help-lint` prints the list for your JDK (Java 21 and 25 differ by a few entries). The categories, each with what it warns about:
+    - `auxiliaryclass`: a second class hidden in a source file with another name, used from other files.
+    - `cast`: a cast that does nothing. `classfile`: problems in compiled class files.
+    - `deprecation`: use of something marked deprecated. `dep-ann`: marked deprecated in a comment but missing the `@Deprecated` annotation. `removal`: use of something scheduled for removal.
+    - `divzero`: dividing an integer by the constant 0. `empty`: an empty statement after an `if`.
+    - `exports`, `module`, `opens`, `requires-automatic`, `requires-transitive-automatic`: problems with the Java module system (this repository does not use modules).
+    - `fallthrough`: one `case` of an old-style `switch` running on into the next.
+    - `finally`: a `finally` block that does not finish normally.
+    - `identity`/`synchronization`: locking on objects that are not meant to be locked on.
+    - `lossy-conversions`: a compound assignment such as `int x += 1.5` that silently drops information.
+    - `missing-explicit-ctor`: a public class in an exported package without a written constructor.
+    - `options`: problems with the command-line options. `output-file-clash`: two sources writing the same output file. `path`: a bad entry on the class path.
+    - `overloads`: methods overloaded in a way that is ambiguous. `overrides`: a class defining `equals` without `hashCode`, and similar.
+    - `processing`: problems with annotation processing. `rawtypes`: a generic type used without its type argument (`List` instead of `List<Booking>`).
+    - `serial`: a serializable class without `serialVersionUID`. `static`: reaching a static member through an instance. `strictfp`: a needless `strictfp`.
+    - `text-blocks`: inconsistent whitespace in a text block. `this-escape`: a constructor calling a method a subclass could override.
+    - `try`: problems with `try` and try-with-resources, such as a resource never used. `unchecked`: an unchecked generic operation. `varargs`: an unsafe variable-argument method. `preview`: use of preview features.
   - `-Werror` turns every warning into an error. A single warning fails the build, so warnings cannot pile up.
 
 A real example from this repository's history: `-Xlint:all -Werror` stopped the build on a `try (SomeResource x = ...)` whose variable was never used in the body (the `try` lint category: "auto-closeable resource ... is never referenced in body of corresponding try statement"). The code was rewritten to close the resource in a `finally` block instead. The compiler pointed at a real design smell.

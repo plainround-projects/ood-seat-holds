@@ -52,49 +52,59 @@ private static void log(String action, SeatId seat, CustomerId customer, Outcome
 ### Configuring the output
 
 ```java
-package io.plainround.seatholds.interfaces.cli;
-
-import java.util.List;
-import java.util.logging.Handler;
-import java.util.logging.Level;
-import java.util.logging.LogManager;
-import java.util.logging.Logger;
-
-/** Sends the JDK system logger's output to standard error as one {@code key=value} line each. */
-final class Logging {
-
-  private static final List<String> LEVELS = List.of("SEVERE", "WARNING", "INFO", "FINE");
-
-  private Logging() {}
-
-  static void requireKnownLevel(String level) {
-    if (!LEVELS.contains(level)) {
-      throw new IllegalArgumentException("LOG_LEVEL must be one of " + LEVELS + ", was " + level);
-    }
-  }
-
-  static void configure(String level) {
-    System.setProperty(
-        "java.util.logging.SimpleFormatter.format", "ts=%1$tFT%1$tT.%1$tL%1$tz level=%4$s %5$s%n");
-    LogManager.getLogManager().reset();
-    Logger root = Logger.getLogger("");
-    root.addHandler(new java.util.logging.ConsoleHandler());
-    Level parsed = Level.parse(level);
-    root.setLevel(parsed);
-    for (Handler handler : root.getHandlers()) {
-      handler.setLevel(parsed);
-    }
-  }
-}
+ 1  package io.plainround.seatholds.interfaces.cli;
+ 2  
+ 3  import java.util.List;
+ 4  import java.util.logging.Handler;
+ 5  import java.util.logging.Level;
+ 6  import java.util.logging.LogManager;
+ 7  import java.util.logging.Logger;
+ 8  
+ 9  /** Sends the JDK system logger's output to standard error as one {@code key=value} line each. */
+10  final class Logging {
+11  
+12    private static final List<String> LEVELS = List.of("SEVERE", "WARNING", "INFO", "FINE");
+13  
+14    private Logging() {}
+15  
+16    static void requireKnownLevel(String level) {
+17      if (!LEVELS.contains(level)) {
+18        throw new IllegalArgumentException("LOG_LEVEL must be one of " + LEVELS + ", was " + level);
+19      }
+20    }
+21  
+22    static void configure(String level) {
+23      System.setProperty(
+24          "java.util.logging.SimpleFormatter.format", "ts=%1$tFT%1$tT.%1$tL%1$tz level=%4$s %5$s%n");
+25      LogManager.getLogManager().reset();
+26      Logger root = Logger.getLogger("");
+27      root.addHandler(new java.util.logging.ConsoleHandler());
+28      Level parsed = Level.parse(level);
+29      root.setLevel(parsed);
+30      for (Handler handler : root.getHandlers()) {
+31        handler.setLevel(parsed);
+32      }
+33    }
+34  }
 ```
 
-- The class is `final` with a private constructor: it only holds static helper methods and is never created.
-- `requireKnownLevel` checks `LOG_LEVEL` against the list `SEVERE, WARNING, INFO, FINE` and throws if it is wrong, which `AppConfig` turns into the exit-code-2 error.
-- `configure(level)` first sets the JUL system property `java.util.logging.SimpleFormatter.format` to `ts=%1$tFT%1$tT.%1$tL%1$tz level=%4$s %5$s%n`. That is a **format string**: `%1$tFT%1$tT.%1$tL` prints the time (date, a literal `T`, time, a dot, milliseconds), `%1$tz` prints the machine's time-zone offset (`+0000` for UTC, `+0200` two hours ahead), `%4$s` prints the level, `%5$s` prints the message and `%n` is a line break. The numbers are argument positions: 1 = time, 4 = level, 5 = message.
-- `LogManager.getLogManager().reset()` removes the default handlers. A new `ConsoleHandler` is added to the **root logger** (the ancestor of every logger).
-- The level is set on the root logger and on each handler: a message must pass both to be printed. `Level.parse(level)` converts the text `FINE` into the `Level` object.
+| Lines | What they do |
+| --- | --- |
+| 3-7 | Imports the built-in logging classes: `Handler` (something that writes log records somewhere), `Level` (importance), `LogManager` (the central registry), `Logger`, and `List`. |
+| 9-10 | `final class Logging`: package-private (no `public`) and `final`. |
+| 12 | `LEVELS`: the four level names accepted in `LOG_LEVEL`, as an unchangeable list. They are JUL's names: `SEVERE` (an error), `WARNING`, `INFO`, `FINE` (the debug level). |
+| 14 | A private constructor: the class only holds static methods and is never created. |
+| 16-20 | `requireKnownLevel`: if the text is not one of the four, throw `IllegalArgumentException("LOG_LEVEL must be one of [...], was ...")`. `AppConfig` turns this into the exit-code-2 error. |
+| 22 | `configure(level)` sets logging up once at start-up. |
+| 23-24 | Sets a JUL **system property** (a named setting of the JVM) called `java.util.logging.SimpleFormatter.format` to the format string `ts=%1$tFT%1$tT.%1$tL%1$tz level=%4$s %5$s%n`. The string is a template with numbered places: `%1$tF` is argument 1 (the time) as an ISO date, then a literal `T`, `%1$tT` the time of day, a dot, `%1$tL` the milliseconds, `%1$tz` the time-zone offset (`+0000` for UTC); then ` level=` and `%4$s` argument 4 (the level) as text; a space and `%5$s` argument 5 (the message); `%n` a line break. |
+| 25 | `LogManager.getLogManager().reset()` removes every handler JUL set up by default. |
+| 26 | `Logger.getLogger("")` is the **root logger**, the ancestor of every logger. |
+| 27 | Adds a new `ConsoleHandler`, which writes to **standard error**. |
+| 28 | `Level.parse(level)` turns the text `FINE` into the `Level` object. |
+| 29 | Sets the level on the root logger: a record below it is discarded. |
+| 30-32 | Sets the same level on every handler (`for (Handler handler : root.getHandlers())` visits each): a record must pass **both** the logger's level and the handler's level to be printed. |
 
-An example line printed by this repository:
+An example line printed by this repository (a line printed for a log call such as the one above):
 
 ```text
 ts=2026-10-26T22:23:24.832+0000 level=INFO event=book room=room-1 person=ada range=09:00-10:00 outcome=Booked

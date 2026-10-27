@@ -19,7 +19,7 @@ The template says the layers are folders, with the rule "domain depends on nothi
 
 1. The annotation `@AnalyzeClasses(packages = "...")` on the test class tells ArchUnit to **import** every class under that package. It reads the `.class` files in `target/classes` (compiled code, `javac.md`), not the source.
 2. `ImportOption.DoNotIncludeTests` leaves out test classes, so the rules judge only production code.
-3. For each class it records **dependencies**: every class it references through fields, method parameters, return types, calls, `new`, annotations and so on.
+3. For each class it records **dependencies**: every class it references: through a field type, a method parameter or return type, a method call, a `new` expression, a thrown exception, an annotation or a `throws` clause.
 4. Each field marked `@ArchTest` and typed `ArchRule` is a rule. The JUnit integration (`archunit-junit5`) runs each as a test. A rule is a sentence built with a fluent API: `classes().that().resideInAPackage(X).should().onlyDependOnClassesThat(...)`.
 5. If any class breaks a rule, the test fails and lists each violation with the class and line that caused it.
 

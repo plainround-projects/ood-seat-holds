@@ -24,6 +24,7 @@ These notes teach every technology this repository uses, from zero, through the 
 | [maven-failsafe.md](maven-failsafe.md) | The plugin that runs the `*IT` database tests. |
 | [maven-dependency-plugin.md](maven-dependency-plugin.md) | Lists libraries for the audit and copies them to `target/lib`. |
 | [junit.md](junit.md) | The test framework and the abstract contract test. |
+| [junit-test-walkthrough.md](junit-test-walkthrough.md) | Every test class and test method in this repository: what each one checks and why. |
 | [assertj.md](assertj.md) | Readable assertions. |
 | [archunit.md](archunit.md) | Tests that enforce the layers, no concurrency in the domain, SQL only in the JDBC adapter. |
 | [jacoco.md](jacoco.md) | Code coverage and the 95 percent gate. |
@@ -48,7 +49,7 @@ These notes teach every technology this repository uses, from zero, through the 
 1. **The language:** `java.md`, then `java-concurrency.md`.
 2. **The database:** `postgresql.md`, `sql.md`, `jdbc.md`, `hikaricp.md`, `docker-compose.md`.
 3. **The build tool:** `maven-wrapper.md`, `maven.md`, `javac.md`.
-4. **The tests:** `junit.md`, `assertj.md`, `archunit.md`, `testcontainers.md`, `maven-surefire.md`, `maven-failsafe.md`, `jacoco.md`.
+4. **The tests:** `junit.md`, `junit-test-walkthrough.md`, `assertj.md`, `archunit.md`, `testcontainers.md`, `maven-surefire.md`, `maven-failsafe.md`, `jacoco.md`.
 5. **The quality checks:** `spotless-google-java-format.md`, `checkstyle.md`, `maven-enforcer.md`, `maven-dependency-plugin.md`, `python.md`, `osv.md`.
 6. **Running and delivering:** `make.md`, `bash-and-shell.md`, `environment-variables.md`, `java-logging.md`, `slf4j.md`, `docker.md`, `git.md`, `github-actions.md`.
 7. **The file formats:** `xml.md`, `yaml.md`, `markdown.md`, `mermaid.md`, `editorconfig.md`.

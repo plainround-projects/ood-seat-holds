@@ -26,48 +26,54 @@ At start-up Hikari opens connections up to the **maximum pool size**. `getConnec
 ## Walkthrough of this repository's use
 
 ```java
-package io.plainround.seatholds.infrastructure.jdbc;
-
-import com.zaxxer.hikari.HikariConfig;
-import com.zaxxer.hikari.HikariDataSource;
-
-/** Builds the connection pool. The pool is the concurrency limit: a thousand callers share it. */
-public final class PostgresDataSource {
-
-  private static final long STARTUP_RETRY_MILLIS = 30_000;
-
-  private PostgresDataSource() {}
-
-  /**
-   * Opens a pool. If the database is still starting, the pool keeps trying for 30 seconds before
-   * giving up, and every request for a connection waits at most the configured connection timeout,
-   * then fails with an exception rather than queueing forever.
-   *
-   * @param settings where the database is
-   * @return a pool the caller must close
-   */
-  public static HikariDataSource open(DatabaseSettings settings) {
-    HikariConfig config = new HikariConfig();
-    config.setJdbcUrl(settings.url());
-    config.setUsername(settings.user());
-    config.setPassword(settings.password());
-    config.setMaximumPoolSize(settings.poolSize());
-    config.setConnectionTimeout(settings.connectionTimeout().toMillis());
-    config.setInitializationFailTimeout(STARTUP_RETRY_MILLIS);
-    config.setPoolName("seat-holds");
-    return new HikariDataSource(config);
-  }
-}
+ 1  package io.plainround.seatholds.infrastructure.jdbc;
+ 2  
+ 3  import com.zaxxer.hikari.HikariConfig;
+ 4  import com.zaxxer.hikari.HikariDataSource;
+ 5  
+ 6  /** Builds the connection pool. The pool is the concurrency limit: a thousand callers share it. */
+ 7  public final class PostgresDataSource {
+ 8  
+ 9    private static final long STARTUP_RETRY_MILLIS = 30_000;
+10  
+11    private PostgresDataSource() {}
+12  
+13    /**
+14     * Opens a pool. If the database is still starting, the pool keeps trying for 30 seconds before
+15     * giving up, and every request for a connection waits at most the configured connection timeout,
+16     * then fails with an exception rather than queueing forever.
+17     *
+18     * @param settings where the database is
+19     * @return a pool the caller must close
+20     */
+21    public static HikariDataSource open(DatabaseSettings settings) {
+22      HikariConfig config = new HikariConfig();
+23      config.setJdbcUrl(settings.url());
+24      config.setUsername(settings.user());
+25      config.setPassword(settings.password());
+26      config.setMaximumPoolSize(settings.poolSize());
+27      config.setConnectionTimeout(settings.connectionTimeout().toMillis());
+28      config.setInitializationFailTimeout(STARTUP_RETRY_MILLIS);
+29      config.setPoolName("seat-holds");
+30      return new HikariDataSource(config);
+31    }
+32  }
 ```
 
-- The class is `final` with a private constructor: it only holds one static method.
-- `new HikariConfig()` collects the settings.
-- `setJdbcUrl`, `setUsername`, `setPassword`: where to connect and as whom (from `DatabaseSettings`).
-- `setMaximumPoolSize(settings.poolSize())`: at most that many connections (default 16 from the `POOL_SIZE` setting).
-- `setConnectionTimeout(settings.connectionTimeout().toMillis())`: how long a caller may wait for a free connection (default 30 seconds, from `CONNECTION_TIMEOUT`). After that it fails with a clear exception instead of waiting forever. This was 10 seconds at first and was too short for 1,000 waiting threads on a heavily loaded computer, so it became a setting.
-- `setInitializationFailTimeout(30_000)`: at start-up keep retrying for 30 seconds if the database is not ready yet, rather than failing at once. This is the "retry with backoff on the network call" rule applied where it is safe (opening a pool, not a write).
-- `setPoolName("seat-holds")`: the name in log lines.
-- `return new HikariDataSource(config)` creates and starts the pool.
+| Lines | What they do |
+| --- | --- |
+| 3-4 | Imports Hikari's two classes: `HikariConfig` (the settings holder) and `HikariDataSource` (the pool). |
+| 7 | `public final class PostgresDataSource`: a class that only holds one static method. |
+| 9 | `STARTUP_RETRY_MILLIS = 30_000`: 30 seconds (the underscore in a number is only for reading). |
+| 11 | A private constructor: nobody creates one. |
+| 21 | `public static HikariDataSource open(DatabaseSettings settings)`: builds and starts a pool from validated settings. |
+| 22 | `new HikariConfig()` collects the settings. |
+| 23-25 | `setJdbcUrl`, `setUsername`, `setPassword`: where to connect and as whom. |
+| 26 | `setMaximumPoolSize(settings.poolSize())`: at most that many connections (default 16, from `POOL_SIZE`). |
+| 27 | `setConnectionTimeout(...)`: how long a caller may wait for a free connection (default 30 seconds, from `CONNECTION_TIMEOUT`); after that `getConnection()` throws a clear exception instead of waiting forever. It was 10 seconds at first and was too short for 1,000 waiting threads on a heavily loaded computer, so it became a setting. |
+| 28 | `setInitializationFailTimeout(STARTUP_RETRY_MILLIS)`: at start-up keep retrying for 30 seconds if the database is not ready yet, rather than failing at once. This is the "retry on the network call" rule applied where it is safe (opening a pool, not a write). |
+| 29 | `setPoolName("seat-holds")`: the name that appears in log lines. |
+| 30 | `new HikariDataSource(config)` creates and starts the pool. |
 
 `JdbcSeatStore.open(settings)` calls this and keeps the pool, and `JdbcSeatStore.close()` closes it. The command line's `Application` closes the store when the command ends.
 

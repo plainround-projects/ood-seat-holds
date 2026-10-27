@@ -116,7 +116,7 @@ Only what the lesson scopes out:
 ├── config/checkstyle.xml        lint rules (Javadoc on the public surface, no TODOs, no unused imports)
 ├── scripts/audit.py             dependency audit against the OSV database
 ├── docs/adr/                    decision records
-├── tech/                        36 notes, one per technology used here, written for a complete beginner (start at tech/README.md)
+├── tech/                        37 notes, one per technology used here, written for a complete beginner (start at tech/README.md)
 ├── src/main/java/io/plainround/seatholds/
 │   ├── domain/                  SeatState, Outcome, SeatTransitions, the SeatStore and Clock ports: depends on java.* only
 │   ├── application/             HoldSeats, ConfirmHold, ExpireHolds, SeatHoldService: depends on domain
@@ -144,7 +144,7 @@ The dependency rule is enforced by `architecture/ArchitectureTest`; a wrong impo
 
 ## Technology notes
 
-The [tech/](tech/README.md) folder teaches every technology this repository uses, from zero, through the repository's own files: 36 notes, one per language, library, tool, service and file format. Each explains what the technology is, why it is here, how it works underneath, and walks through this repository's own code and settings line by line, with commands to try and five questions to check yourself. Start with the ten-minute shortlist in [tech/README.md](tech/README.md).
+The [tech/](tech/README.md) folder teaches every technology this repository uses, from zero, through the repository's own files: 37 notes, one per language, library, tool, service and file format. Each explains what the technology is, why it is here, how it works underneath, and walks through this repository's own code and settings line by line, with commands to try and five questions to check yourself. Start with the ten-minute shortlist in [tech/README.md](tech/README.md).
 
 ## Verification
 
