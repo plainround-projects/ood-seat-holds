@@ -40,7 +40,7 @@ run-jdbc: build ## the same scenarios on PostgreSQL (make up first)
 
 RUNS ?= 20
 race: build ## race 1000 customers for 10 seats RUNS times (default 20); add STORE=jdbc after make up
-	java -cp "$(CLASSPATH)" $(MAIN) race $(RUNS) 1000
+	env $(if $(filter jdbc,$(STORE)),$(JDBC_ENV)) java -cp "$(CLASSPATH)" $(MAIN) race $(RUNS) 1000
 
 serve: build ## sweep expired holds every SWEEP_INTERVAL until Ctrl-C, then stop cleanly
 	java -cp "$(CLASSPATH)" $(MAIN) serve

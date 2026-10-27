@@ -20,6 +20,8 @@ import org.testcontainers.utility.DockerImageName;
  */
 public final class PostgresFixture {
 
+  private static final String EXTERNAL_URL = System.getenv("TEST_DATABASE_URL");
+
   private static final PostgreSQLContainer<?> POSTGRES =
       new PostgreSQLContainer<>(
               DockerImageName.parse(System.getenv().getOrDefault("POSTGRES_IMAGE", "postgres:18")))
@@ -32,19 +34,29 @@ public final class PostgresFixture {
   /** The shared pool, created on first use with the schema applied. */
   public static synchronized HikariDataSource pool() {
     if (pool == null) {
-      POSTGRES.start();
-      pool =
-          PostgresDataSource.open(
-              new DatabaseSettings(
-                  POSTGRES.getJdbcUrl(),
-                  POSTGRES.getUsername(),
-                  POSTGRES.getPassword(),
-                  16,
-                  Duration.ofMinutes(3)));
+      pool = PostgresDataSource.open(settings());
       applySchema();
       Runtime.getRuntime().addShutdownHook(new Thread(pool::close, "close-test-pool"));
     }
     return pool;
+  }
+
+  private static DatabaseSettings settings() {
+    if (EXTERNAL_URL != null) {
+      return new DatabaseSettings(
+          EXTERNAL_URL,
+          System.getenv().getOrDefault("TEST_DATABASE_USER", "seatholds"),
+          System.getenv().getOrDefault("TEST_DATABASE_PASSWORD", "seatholds-local-only"),
+          16,
+          Duration.ofMinutes(3));
+    }
+    POSTGRES.start();
+    return new DatabaseSettings(
+        POSTGRES.getJdbcUrl(),
+        POSTGRES.getUsername(),
+        POSTGRES.getPassword(),
+        16,
+        Duration.ofMinutes(3));
   }
 
   private static void applySchema() {
