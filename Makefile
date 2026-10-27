@@ -1,7 +1,7 @@
 # make up | run | run-jdbc | race | test | test-integration | lint | audit | check | down      (make help lists everything)
 MVN := ./mvnw -B -q
 MAIN := io.plainround.seatholds.interfaces.cli.Main
-CLASSPATH := target/classes:target/lib/*
+JAVA_CP := target/classes:target/lib/*
 POSTGRES_PORT ?= 55468
 PSQL := docker compose exec -T db psql -v ON_ERROR_STOP=1 -U seatholds seatholds
 
@@ -31,22 +31,22 @@ psql: ## open a psql session on the database
 	docker compose exec db psql -U seatholds seatholds
 
 run: build ## the lesson's scenarios on the in-memory store, and the failure they guard against
-	java -cp "$(CLASSPATH)" $(MAIN) scenario
+	java -cp "$(JAVA_CP)" $(MAIN) scenario
 
 JDBC_ENV = STORE=jdbc DATABASE_URL=$${DATABASE_URL:-jdbc:postgresql://localhost:$(POSTGRES_PORT)/seatholds} DATABASE_USER=$${DATABASE_USER:-seatholds} DATABASE_PASSWORD=$${DATABASE_PASSWORD:-seatholds-local-only}
 
 run-jdbc: build ## the same scenarios on PostgreSQL (make up first)
-	env $(JDBC_ENV) java -cp "$(CLASSPATH)" $(MAIN) scenario
+	env $(JDBC_ENV) java -cp "$(JAVA_CP)" $(MAIN) scenario
 
 RUNS ?= 20
 race: build ## race 1000 customers for 10 seats RUNS times (default 20); add STORE=jdbc after make up
-	env $(if $(filter jdbc,$(STORE)),$(JDBC_ENV)) java -cp "$(CLASSPATH)" $(MAIN) race $(RUNS) 1000
+	env $(if $(filter jdbc,$(STORE)),$(JDBC_ENV)) java -cp "$(JAVA_CP)" $(MAIN) race $(RUNS) 1000
 
 serve: build ## sweep expired holds every SWEEP_INTERVAL until Ctrl-C, then stop cleanly
-	java -cp "$(CLASSPATH)" $(MAIN) serve
+	java -cp "$(JAVA_CP)" $(MAIN) serve
 
 health: build ## exit 0 when the configuration and the store are usable
-	java -cp "$(CLASSPATH)" $(MAIN) health
+	java -cp "$(JAVA_CP)" $(MAIN) health
 
 lint: ## format check, compiler lint (-Xlint:all -Werror), checkstyle
 	$(MVN) spotless:check
