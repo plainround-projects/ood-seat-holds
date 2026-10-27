@@ -21,7 +21,7 @@ final class Logging {
 
   static void configure(String level) {
     System.setProperty(
-        "java.util.logging.SimpleFormatter.format", "ts=%1$tFT%1$tT.%1$tLZ level=%4$s %5$s%n");
+        "java.util.logging.SimpleFormatter.format", "ts=%1$tFT%1$tT.%1$tL%1$tz level=%4$s %5$s%n");
     LogManager.getLogManager().reset();
     Logger root = Logger.getLogger("");
     root.addHandler(new java.util.logging.ConsoleHandler());
