@@ -116,6 +116,7 @@ Only what the lesson scopes out:
 ├── config/checkstyle.xml        lint rules (Javadoc on the public surface, no TODOs, no unused imports)
 ├── scripts/audit.py             dependency audit against the OSV database
 ├── docs/adr/                    decision records
+├── tech/                        36 notes, one per technology used here, written for a complete beginner (start at tech/README.md)
 ├── src/main/java/io/plainround/seatholds/
 │   ├── domain/                  SeatState, Outcome, SeatTransitions, the SeatStore and Clock ports: depends on java.* only
 │   ├── application/             HoldSeats, ConfirmHold, ExpireHolds, SeatHoldService: depends on domain
@@ -141,6 +142,10 @@ The dependency rule is enforced by `architecture/ArchitectureTest`; a wrong impo
 
 `make check` runs the formatter check, the compiler with `-Xlint:all -Werror` (the type check), checkstyle, all unit, architecture and end-to-end tests, and a JaCoCo gate: the `domain`, `application` and `application.simulation` packages must keep at least 95 percent line and 90 percent branch coverage. `make test-integration` adds the PostgreSQL tests. `make audit` queries the OSV database for every resolved dependency. CI ([.github/workflows/ci.yml](.github/workflows/ci.yml)) runs `make check` and `make run` on Java 21 and 25, `make test-integration` once, and `make audit` once.
 
+## Technology notes
+
+The [tech/](tech/README.md) folder teaches every technology this repository uses, from zero, through the repository's own files: 36 notes, one per language, library, tool, service and file format. Each explains what the technology is, why it is here, how it works underneath, and walks through this repository's own code and settings line by line, with commands to try and five questions to check yourself. Start with the ten-minute shortlist in [tech/README.md](tech/README.md).
+
 ## Verification
 
 What was run, on 2026-10-27, on macOS with Temurin 25.0.2 (CI also targets Java 21):
@@ -150,7 +155,10 @@ What was run, on 2026-10-27, on macOS with Temurin 25.0.2 (CI also targets Java 
 - `make up`, `make queries` and `make run-jdbc` on PostgreSQL 18 from `docker-compose.yml`: all pass (with `CONNECTION_TIMEOUT=PT10M`, because the machine was saturated). `serve` stops cleanly on SIGTERM and exits 0.
 - `JdbcSeatStoreIT` (the identical contract class): 12 of 12, once on Testcontainers and once on the compose database. `JdbcHoldRaceIT` (20 races of 1,000 virtual threads, each `wins=10 losses=990`, and 100 sweep-versus-confirm repetitions): passed on Testcontainers.
 
-Pending capacity: run `make test-integration` as one command, and `make docker-build && docker run --rm ood-seat-holds:dev`, after Docker Desktop is restarted with free disk (Docker.raw was at its 60 GiB cap on 2026-10-28). The single-command run was not green on the overloaded machine: the PostgreSQL container took 5 to 8 minutes to start and timed out once, and one run was killed by an outside SIGTERM; the per-class runs above passed. The container image was not built.
+- After the last code change (the log timestamp now prints the machine's time-zone offset instead of a fixed `Z`), `make lint` and `make test` (85 tests, coverage gate met) were rerun and pass.
+- Technology notes in `tech/`: every link under "Further reading" was fetched and resolves (the notes were written against the pinned versions; a few statements were checked against the official documentation: JUnit 6 needs Java 17, Surefire and Failsafe default test-name patterns, JaCoCo's `argLine`, checkstyle's `MissingOverride`). A sample of the "Try it yourself" commands was run (the `repl` input, `javap`, `xmllint`, the Ruby YAML one-liner, `make help`, `git check-ignore`); the ones that need Docker or a network failure were not all run.
+
+Pending capacity: run `make test-integration` as one command, and `make docker-build && docker run --rm ood-seat-holds:dev`, once the machine is quiet (on 2026-10-28 its load average was above 200, so the Docker checks were not rerun after Docker's disk problem was fixed; the shared-machine rule says to wait for a load under 30). The single-command run was not green on the overloaded machine: the PostgreSQL container took 5 to 8 minutes to start and timed out once, and one run was killed by an outside SIGTERM; the per-class runs above passed. The container image was not built.
 
 ## License
 
