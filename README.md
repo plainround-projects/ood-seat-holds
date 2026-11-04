@@ -10,6 +10,24 @@ The seat-hold core of an event ticketing system: a seat is free, held for one cu
 | **Architecture** | [ARCHITECTURE.md](ARCHITECTURE.md), decisions in [docs/adr](docs/adr) |
 | **Author** | Sumit Srivastava |
 
+## Architecture
+
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="docs/diagrams/architecture-dark.svg">
+  <img alt="Callers, the ScheduledSweeper and the race drivers use the inbound ports of SeatHoldService, which reads through the SeatStore port, decides with the pure SeatTransitions and the Clock port, and writes with update. InMemorySeatStore and JdbcSeatStore with PostgreSQL implement the store; PlainWriteSeatStore is the counter-example." src="docs/diagrams/architecture.svg">
+</picture>
+
+The hexagon holds no locks: the guarantee that a seat is sold at most once is the compare-and-set in SeatStore.update, which both adapters implement.
+
+## How one run flows
+
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="docs/diagrams/flow-dark.svg">
+  <img alt="Ada holds s-9 and Bruno's identical update loses the compare-and-set, so he reads again and is told the seat is held; Ada confirms, and a confirm racing the sweeper ends with the seat Sold or Free, never both." src="docs/diagrams/flow.svg">
+</picture>
+
+The amber rows are the lost update and the reason Bruno gets; the green box is the one outcome the race may end in.
+
 ## Prerequisites
 
 | Tool | Version | Used for |

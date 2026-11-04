@@ -1,0 +1,138 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="880" viewBox="0 0 1200 880" role="img" aria-labelledby="t d">
+<title id="t">Architecture of ood-seat-holds</title>
+<desc id="d">A Caller (the Cli, HTTP or a test) and the ScheduledSweeper call the inbound ports HoldSeats, ConfirmHold and ExpireHolds, all implemented by SeatHoldService inside the hexagon of domain and application. The service reads through the SeatStore port, asks the pure SeatTransitions what the next state is using the Clock port, and writes with update, a compare-and-set. InMemorySeatStore and JdbcSeatStore, which talks to PostgreSQL, implement SeatStore, and SystemClock implements Clock. PlainWriteSeatStore is the counter-example and is never wired in. Race drivers run a thousand threads against the ports.</desc>
+<style>
+:root{--paper:#0d1117;--ink:#f5f4f8;--mute:#9a96ab;--accent:#6ec8ff;--good:#7ce0a1;--warn:#ffd166}
+text{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,'Liberation Mono',monospace;fill:var(--ink)}
+.title{font-family:Georgia,'Iowan Old Style','Times New Roman',serif;font-size:36px}
+.caption{font-size:16px;fill:var(--mute)}
+.name{font-size:20px;font-weight:600}
+.lane{font-size:17px;font-weight:600}
+.sub{font-size:15px;fill:var(--mute)}
+.label{font-size:15px}
+.tag{font-size:15px;fill:var(--mute)}
+.num{font-size:15px;font-weight:700;fill:var(--paper)}
+.legend{font-size:14px;fill:var(--mute)}
+.t-accent{fill:var(--accent)}
+.t-good{fill:var(--good)}
+.t-warn{fill:var(--warn)}
+.t-ink{fill:var(--ink)}
+.b{font-weight:600}
+.paper{fill:var(--paper);stroke:var(--mute);stroke-opacity:.3}
+.grid{fill:url(#grid)}
+.boundary{fill:var(--mute);fill-opacity:.035;stroke:var(--mute);stroke-opacity:.7;stroke-dasharray:6 5}
+.svc{fill:var(--accent);fill-opacity:.08;stroke:var(--accent);stroke-width:1.25}
+.store{fill:var(--mute);fill-opacity:.1;stroke:var(--mute);stroke-width:1.25}
+.rim{fill:none;stroke:var(--mute);stroke-width:1.25}
+.actor{fill:none;stroke:var(--mute);stroke-width:1.25}
+.slot{fill:var(--accent);fill-opacity:.14;stroke:var(--accent);stroke-width:1}
+.note{fill:var(--warn);fill-opacity:.09;stroke:var(--warn);stroke-width:1}
+.win{fill:var(--good);fill-opacity:.09;stroke:var(--good);stroke-width:1}
+.hair{fill:none;stroke:var(--mute);stroke-opacity:.4;stroke-width:1}
+.zone{fill:var(--accent);fill-opacity:.045;stroke:var(--accent);stroke-width:1.25;stroke-dasharray:6 5}
+.stop{fill:none;stroke:var(--warn);stroke-width:4;stroke-linecap:round}
+.mask{fill:var(--paper)}
+.sync,.async,.read,.fail,.ok{fill:none}
+.sync{stroke:var(--accent);stroke-width:1.75;marker-end:url(#a-sync)}
+.async{stroke:var(--accent);stroke-width:1.75;stroke-dasharray:8 6;marker-end:url(#a-async)}
+.read{stroke:var(--mute);stroke-width:1.75;stroke-linecap:round;stroke-dasharray:1 6;marker-end:url(#a-read)}
+.fail{stroke:var(--warn);stroke-width:2;marker-end:url(#a-fail)}
+.ok{stroke:var(--good);stroke-width:1.75;marker-end:url(#a-ok)}
+.dot{fill:var(--accent)}
+.dot-w{fill:var(--warn)}
+.dot-g{fill:var(--good)}
+.head-sync,.head-async{stroke:var(--accent)}
+.head-sync{fill:var(--accent)}
+.head-async,.head-read{fill:none;stroke-width:1.6;stroke-linecap:round;stroke-linejoin:round}
+.head-read{stroke:var(--mute)}
+.head-fail{fill:var(--warn)}
+.head-ok{fill:var(--good)}
+.gridline{fill:none;stroke:var(--mute);stroke-opacity:.09}
+</style>
+<defs>
+<pattern id="grid" width="40" height="40" patternUnits="userSpaceOnUse"><path class="gridline" d="M40 0H0V40"/></pattern>
+<marker id="a-sync" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="9" markerHeight="9" markerUnits="userSpaceOnUse" orient="auto-start-reverse"><path class="head-sync" d="M0 0L10 5L0 10z"/></marker>
+<marker id="a-async" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="10" markerHeight="10" markerUnits="userSpaceOnUse" orient="auto-start-reverse"><path class="head-async" d="M1 1L9 5L1 9"/></marker>
+<marker id="a-read" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="10" markerHeight="10" markerUnits="userSpaceOnUse" orient="auto-start-reverse"><path class="head-read" d="M1 1L9 5L1 9"/></marker>
+<marker id="a-fail" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="10" markerHeight="10" markerUnits="userSpaceOnUse" orient="auto-start-reverse"><path class="head-fail" d="M0 0L10 5L0 10z"/></marker>
+<marker id="a-ok" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="9" markerHeight="9" markerUnits="userSpaceOnUse" orient="auto-start-reverse"><path class="head-ok" d="M0 0L10 5L0 10z"/></marker>
+</defs>
+<rect class="paper" x="0.5" y="0.5" width="1199" height="879" rx="16"/>
+<rect class="grid" x="1" y="1" width="1198" height="878" rx="16"/>
+<text class="title" x="48" y="68">Sold at most once, because the store decides</text>
+<text class="caption" x="48" y="100">The domain has no locks. The guarantee lives in SeatStore.update, which both adapters implement as compare-and-set.</text>
+<rect class="actor" x="48" y="164" width="224" height="72" rx="36"/>
+<text class="name" x="160" y="196" text-anchor="middle">Caller</text>
+<text class="sub" x="160" y="218" text-anchor="middle">Cli, HTTP or a test</text>
+<rect class="svc" x="48" y="262" width="224" height="84" rx="12"/>
+<text class="name" x="64" y="294">ScheduledSweeper</text>
+<text class="sub" x="64" y="318">infrastructure</text>
+<text class="sub" x="64" y="340">every SWEEP_INTERVAL</text>
+<rect class="boundary" x="304" y="132" width="848" height="344" rx="14"/>
+<text class="tag" x="320" y="160">hexagon: domain and application</text>
+<rect class="svc" x="328" y="176" width="212" height="112" rx="12"/>
+<text class="name" x="344" y="208">Inbound ports</text>
+<text class="sub" x="344" y="232">HoldSeats</text>
+<text class="sub" x="344" y="254">ConfirmHold</text>
+<text class="sub" x="344" y="276">ExpireHolds</text>
+<rect class="svc" x="616" y="190" width="212" height="84" rx="12"/>
+<text class="name" x="632" y="222">SeatHoldService</text>
+<text class="sub" x="632" y="246">application</text>
+<text class="sub" x="632" y="268">read, decide, write</text>
+<rect class="svc" x="924" y="190" width="212" height="84" rx="12"/>
+<text class="name" x="940" y="222">SeatTransitions</text>
+<text class="sub" x="940" y="246">domain, pure</text>
+<text class="sub" x="940" y="268">SeatState, Outcome</text>
+<rect class="svc" x="328" y="340" width="212" height="112" rx="12"/>
+<text class="name" x="344" y="372">Race drivers</text>
+<text class="sub" x="344" y="396">HoldRace</text>
+<text class="sub" x="344" y="418">SweepConfirmRace</text>
+<text class="sub" x="344" y="440">RendezvousSeatStore</text>
+<rect class="svc" x="616" y="340" width="212" height="112" rx="12"/>
+<text class="name" x="632" y="372">SeatStore</text>
+<text class="sub" x="632" y="396">port: get, add, seats</text>
+<text class="sub" x="632" y="418">update is the</text>
+<text class="sub" x="632" y="440">compare-and-set</text>
+<rect class="svc" x="924" y="340" width="212" height="84" rx="12"/>
+<text class="name" x="940" y="372">Clock</text>
+<text class="sub" x="940" y="396">port</text>
+<text class="sub" x="940" y="418">now()</text>
+<rect class="svc" x="328" y="530" width="236" height="84" rx="12"/>
+<text class="name" x="344" y="562">InMemorySeatStore</text>
+<text class="sub" x="344" y="586">ConcurrentHashMap</text>
+<text class="sub" x="344" y="608">replace(key, old, new)</text>
+<rect class="svc" x="628" y="530" width="200" height="84" rx="12"/>
+<text class="name" x="644" y="562">JdbcSeatStore</text>
+<text class="sub" x="644" y="586">conditional UPDATE</text>
+<text class="sub" x="644" y="608">Hikari pool</text>
+<rect class="svc" x="924" y="530" width="212" height="84" rx="12"/>
+<text class="name" x="940" y="562">SystemClock</text>
+<text class="sub" x="940" y="586">infrastructure</text>
+<text class="sub" x="940" y="608">the real time</text>
+<path class="store" d="M598 662a130 12 0 0 1 260 0v102a130 12 0 0 1 -260 0z"/>
+<path class="rim" d="M598 662a130 12 0 0 0 260 0"/>
+<text class="name" x="728" y="699" text-anchor="middle">PostgreSQL</text>
+<text class="sub" x="728" y="723" text-anchor="middle">seats table</text>
+<text class="sub" x="728" y="747" text-anchor="middle">CHECK seats_state_shape</text>
+<rect class="note" x="304" y="650" width="256" height="100" rx="10"/>
+<text class="label b t-warn" x="320" y="680">PlainWriteSeatStore</text>
+<text class="sub" x="320" y="706">update always says true</text>
+<text class="sub" x="320" y="728">both win; never wired in</text>
+<path class="sync" d="M272 200H328"/>
+<path class="sync" d="M272 280H328"/>
+<path class="sync" d="M540 232H616"/>
+<path class="sync" d="M434 340V288"/>
+<text class="label t-accent" x="446" y="320">1,000 threads</text>
+<path class="sync" d="M722 274V340"/>
+<text class="label t-accent" x="734" y="312">get, update</text>
+<path class="sync" d="M828 232H924"/>
+<text class="label t-accent" x="836" y="222">decide</text>
+<path class="sync" d="M828 256H864Q876 256 876 268V360Q876 372 888 372H924"/>
+<text class="label t-accent" x="888" y="362">now</text>
+<path class="sync" d="M640 452V474Q640 486 628 486H458Q446 486 446 498V530"/>
+<path class="sync" d="M760 452V530"/>
+<path class="sync" d="M1030 424V530"/>
+<path class="sync" d="M728 614V650"/>
+<text class="label t-accent" x="740" y="638">UPDATE</text>
+<path class="sync" d="M48 836H112"/><text class="legend" x="124" y="841">sync call</text>
+</svg>
