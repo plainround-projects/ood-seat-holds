@@ -98,7 +98,7 @@ classDiagram
         +seats() List~SeatId~
     }
     class PaymentGateway {
-        <<port, no adapter built>>
+        <<port, not built: no Java type>>
     }
     class InMemorySeatStore
     class JdbcSeatStore
@@ -151,7 +151,7 @@ A customer holds seat `s-9`, then confirms it, with another customer racing on t
 4. It calls `SeatStore.update(s-9, Free, Held(ada, 00:10:00))`. In memory that is `replace(s-9, Free, Held)`; in PostgreSQL it is `UPDATE seats SET ... WHERE seat_id = 's-9' AND state_type = 'FREE' AND holder IS NOT DISTINCT FROM NULL AND ...`.
 5. Bruno's identical call arrives between his read and his write. The first `update` to reach the store wins and returns true; the second matches no row (or no equal value) and returns false.
 6. The loser's service loop reads the seat again: `Held(ada, ...)`. It decides again: `Reason("seat is held")`. That is returned to Bruno. (If the state changes under it again, it tries up to five times, then answers `Reason("seat is contended, try again")` rather than looping.)
-7. Within ten minutes Ada calls `ConfirmHold.confirm(s-9, ada)`: read `Held(ada, 00:10:00)`, decide `Success(Sold(ada))` because the clock is not after the expiry, write through `update`. After the expiry the same call decides `Reason("hold expired")` and writes nothing.
+7. Within ten minutes Ada calls `ConfirmHold.confirm(s-9, ada)`: read `Held(ada, 00:10:00)`, decide `Success(Sold(ada))` because the clock is not after the expiry, write through `update`. After the expiry the same call decides `Reason("hold expired")` and writes nothing. No payment is taken here: `PaymentGateway` has no Java type and nothing calls it; a real confirm would call it between deciding and writing.
 8. Meanwhile `ScheduledSweeper` calls `ExpireHolds.sweep()` every `SWEEP_INTERVAL`. For each seat it reads, decides `release` (a hold is releasable only after its expiry), and writes through the same `update`. If a confirm and the sweep meet on one seat, both read the same `Held`, both decide a different, correct transition by their own clock, and only one `update` can match; the other re-reads, sees `Sold` or `Free`, and answers with a reason.
 
 ## Decisions and trade-offs
